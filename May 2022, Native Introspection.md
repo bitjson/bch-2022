@@ -120,3 +120,10 @@ Some people have invested into BCH on the premise that it is expected to become 
 ## Statements
 
 TBD.
+
+
+## Copyright Notice
+
+Copyright (c) 2021 GeneralProtocols / Research
+
+Permission is granted to copy, distribute and/or modify this document under the terms of the [MIT license](https://gitlab.com/GeneralProtocols/research/chips/-/blob/master/LICENSE).
