@@ -46,8 +46,8 @@ TBW.
 
 ## Implementations
 
-- Andrew stone have implemented similar features on his next-chain testnet.
-- Jason D has implemented similar features in his bitcoin VM library.
+- [Andrew stone](https://github.com/gandrewstone) have implemented similar features on his [next-chain testnet](http://nextchain.cash/).
+- [Jason Dreyzehner](https://github.com/bitjson) has implemented similar features in his bitcoin VM library.
 
 ### Specification
 
