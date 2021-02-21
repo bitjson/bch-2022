@@ -59,7 +59,13 @@ TBW.
 
 ## Evaluation of Alternatives
 
-There are currently no competing alternative, however, if we do not take action or take action too late, we will incur the following costs:
+There has been similar proposals in the past that has been used to inform the design of this proposal:
+
+- [Jason Dreyzehner](https://github.com/bitjson) created the [initial OP_PUSHSTATE](https://github.com/bitjson/op-pushstate) proposal. It was a good starting point and much of the work has been carried over to this proposal.
+
+- [Tobias Rust](https://github.com/EyeOfPython) made a [multibyte version](https://github.com/slpdex/op-pushstate). _(.. add explanation of why that is not a better proposal ..)_
+
+However, any delay or rejection of native introspection support may incur the following costs:
 
 - Continued use of the inefficient re-verification trick makes the blockchain larger than it needs to be and could have a negative impact on initial block download times and storage requirements.
 
