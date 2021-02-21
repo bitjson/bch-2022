@@ -120,6 +120,3 @@ Some people have invested into BCH on the premise that it is expected to become 
 ## Statements
 
 TBD.
-
-
-*This document is licensed under CC0.*
