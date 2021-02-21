@@ -4,7 +4,7 @@
 
 This proposal updates the Bitcoin Cash scripting language with additional opcodes to natively provide details about the current transaction, such as the output amount and recipients.
 
-> OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
+> OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson)?, [Jonathan Silverblood](https://gitlab.com/monsterbitar)
 > 
 > DISCUSSION: [Telegram](https://t.me/transactionintrospection), Bitcoin Cash Research (soon)
 > 
@@ -42,7 +42,7 @@ In order for Bitcoin Cash to gain adoption as money, it needs to provide similar
 
 ## Technical Description
 
-TBW.
+*(This section still needs to be drafted out. It will mostly look like the previous version listed in the alternatives, where there's one or more opcodes and a table of datapoints one could push to the stack. It's unclear if it will be templated or multiple opcodes, concatenated or not and a few other technical details still needs to be worked out.)*
 
 ## Implementations
 
