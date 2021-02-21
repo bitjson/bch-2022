@@ -6,7 +6,7 @@ This proposal updates the Bitcoin Cash scripting language with additional opcode
 
 > OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
 > 
-> DISCUSSION: [Telegram](https://t.me/transactionintrospection), [Research](...?)
+> DISCUSSION: [Telegram](https://t.me/transactionintrospection), Bitcoin Cash Research (soon)
 > 
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
