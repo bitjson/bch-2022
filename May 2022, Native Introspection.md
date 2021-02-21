@@ -1,4 +1,4 @@
-# NATIVE INTROSPECTION - Proposal for May 15th, 2022
+# Cash Improvement Proposal (CHIP) - May 15th, 2022 - NATIVE INTROSPECTION
 
 ## Summary
 
