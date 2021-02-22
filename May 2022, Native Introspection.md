@@ -4,7 +4,7 @@
 
 This proposal updates the Bitcoin Cash scripting language with additional opcodes to natively provide details about the current transaction, such as the output amount and recipients.
 
-> OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson)?, [Jonathan Silverblood](https://gitlab.com/monsterbitar)
+> OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
 > 
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
 > 
