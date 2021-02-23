@@ -4,6 +4,7 @@
 
 Short and easy to understand intent of this CHIP.
 
+- Version: (important so that statements can refer to specific versions)
 - Is consensus change: (basically yes/no)
 - Owner: (not source of idea, but owner who will be accountable for the outcome of this CHIP)
 - Discussion URL:
