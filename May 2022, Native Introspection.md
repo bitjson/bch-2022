@@ -14,29 +14,35 @@ This proposal updates the Bitcoin Cash scripting language with additional opcode
 
 In order for Bitcoin Cash to gain adoption as money, it needs to provide similar or better features than existing alternatives. One area where Bitcoin Cash can be uniquely positioned is as a cost-efficient programmable money. By improving the Bitcoin Cash script with additional opcodes to provide native introspection, we gain the following benefits:
 
-- Reduces barriers to entry for new developers that want to build smart contracts using transaction introspection.
+- Reduces barrier to entry for new contract developers who no longer have to learn intimate details about transaction signing.
 
-- Improves contract safety by eliminating implementation risks that comes with the complexity of the current re-verification trick used as a workaround.
+- Improves contract safety by eliminating the risk of a naively implemented workaround not doing proper verification.
 
-- Allows for new usecases to be developed as native introspection can provide more information on a transaction than the current re-verification trick.
+- Allows for new usecases to be developed by providing more information on a transaction than the current workaround.
 
-- Allows for larger and more complex smart contracts to be developed as native introspection takes up less scripting space compared with current re-verification trick.
+- Allows for larger and more complex contracts by removing 15~25 opcodes and 20~40 bytes used per transaction, compared to current workaround.
 
-- For transactions that uses introspection, the transaction size can be reduced which lowers the cost on the network in terms of bandwidth and long-term storage.
+- Lowers the network bandwidth and storage costs for the growing number¹ of introspection transactions.
 
-- For transactions that uses introspection, the network processing cost would be reduced since there is no longer any need to do an additional signature verification.
+- Lowers network processing costs by removing one signature verification for the growing number¹ of introspection transactions.
 
-## Implementation Costs and Risks
+  ¹ *There is currently ~100,000 such transactions, but introspection could be used for recurring transactions, such as rent, utilities and netflix subscriptions, which could have a dramatic impact on the network scalability.*
 
-- Native introspection will use up some of the currently available opcodes. Depending on implementation detail, this cost might be small (single opcode, templated data) or it might be significant (every transaction data can be accessed through a unique relevant opcode).
+## Costs and Risks
 
-- Since this would be a consensus change, all node software that validate consensus would need to implement the feature.
+To ensure that the outcome of this proposal is clearly beneficial to the long-term value of Bitcoin Cash the following costs have been taking into consideration and have been deemed acceptable:
 
-- A limited number of libraries and developer tools that offer advanced scripting functionality would need to implement the feature.
+### Implementation costs and risks
 
-  *Wallets, mining pools, exchanges and services does not have to be updated and will continue to function as normal.*
+- Native introspection will use up some of the ~60 currently unused opcodes. Depending on implementation detail, this cost might be small (single opcode, templated data) or it might be significant (every transaction data can be accessed through a unique relevant opcode, with an estimated number of 15 ~ 40 opcodes being reserved for introspection).
 
-## Ongoing Costs and Risks
+- Node software and other services that validate consensus would need to implement the new opcodes.
+
+- A limited¹ number of libraries and developer tools that offer advanced scripting functionality would need to implement the feature.
+
+  ¹ *Wallets, mining pools, exchanges and services does not have to be updated and will continue to function as normal.*
+
+### Ongoing Costs and Risks
 
 - Adding native introspection could increase complexity for any future technical changes to the Bitcoin Cash transaction format.
 
