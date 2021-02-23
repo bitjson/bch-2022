@@ -20,13 +20,15 @@ In order for Bitcoin Cash to gain adoption as money, it needs to provide similar
 
 - Allows for new usecases to be developed by providing more information on a transaction than the current workaround.
 
-- Allows for larger and more complex contracts by removing 15~25 opcodes and 20~40 bytes used per transaction, compared to current workaround.
+- Allows for larger and more complex contracts by removing 15~25 opcodes¹ and 20~40 bytes¹ used per transaction, compared to current workaround.
 
-- Lowers the network bandwidth and storage costs for the growing number¹ of introspection transactions.
+- Lowers the network bandwidth and storage costs for the growing number² of introspection transactions.
 
-- Lowers network processing costs by removing one signature verification for the growing number¹ of introspection transactions.
+- Lowers network processing costs by removing one signature verification for the growing number² of introspection transactions.
 
-  ¹ *There is currently ~100,000 such transactions, but introspection could be used for recurring transactions, such as rent, utilities and netflix subscriptions, which could have a dramatic impact on the network scalability.*
+  ¹ *An optimised preimage validation needs 11 opcodes/bytes (`<preimage> <sig> <pubkey> 2DUP CHECKSIGVERIFY SWAP SIZE 1SUB SPLIT DROP ROT SHA256 ROT CHECKDATASIGVERIFY`) and extracting a single element from the middle (e.g. `hashOutputs`) needs 7 opcodes / 11 bytes (`<preimage> DUP SIZE 40 SUB SPLIT NIP 32 SPLIT DROP`)*. In practice, preimage decoding and verification might be less optimised.
+
+  ² *There is currently ~100,000 such transactions, but introspection could be used for recurring transactions, such as rent, utilities and netflix subscriptions, which could have a dramatic impact on the network scalability.*
 
 ## Costs and Risks
 
