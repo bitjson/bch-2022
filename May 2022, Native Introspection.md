@@ -75,13 +75,13 @@ There has been similar proposals in the past that has been used to inform the de
 
 However, any delay or rejection of native introspection support may incur the following costs:
 
-- Continued use of the inefficient re-verification trick makes the blockchain larger than it needs to be and could have a negative impact on initial block download times and storage requirements.
+- Continued use of the inefficient workaround makes the blockchain larger than it needs to be and could have a negative impact on initial block download times and storage requirements.
 
 - Requirement to use a difficult technical workaround in order to achieve transaction introspection could result in loss of opportunity as development costs and barrier to entry remains high.
 
 - Complexity of the technical workaround in order to achieve transaction introspection could result in otherwise successful businesses having technical problems with their implementation that results in loss of profits and damages reputation of both the company and Bitcoin Cash as a network.
 
-- Some applications and usecases are not possible with the re-verification trick but depending on technical implementation details may be possible with native introspection, not serving these usecases on BCH might result in competitors building these products and gaining theses users instead.
+- Some applications and usecases are not possible with the workaround but depending on technical implementation details may be possible with native introspection, not serving these usecases on BCH might result in competitors building these products and gaining theses users instead.
 
 ## Security considerations
 
