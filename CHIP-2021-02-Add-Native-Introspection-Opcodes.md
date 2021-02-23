@@ -1,4 +1,4 @@
-# Cash Improvement Proposal (CHIP) - May 15th, 2022 - NATIVE INTROSPECTION
+# CHIP - 2021-02 - ADD NATIVE INTROSPECTION OPCODES
 
 ## Summary
 
