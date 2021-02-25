@@ -121,9 +121,9 @@ There is a number of independent developers who have an interest in developing t
 
 - [James Cramer](https://twitter.com/James_Cramer "James Cramer") is experimenting with [SLP Mint Guard](https://github.com/simpleledger/Electron-Cash-SLP/blob/cashscript-dev/lib/cashscript/slp_mint_guard.cash "SLP Mint Guard") to protect minting batons, [SLP Vault](https://github.com/simpleledger/Electron-Cash-SLP/blob/cashscript-dev/lib/cashscript/slp_vault.cash "SLP Vault") to help reclaim unclaimed tokens, making [tokens with minting schedules](https://github.com/simpleledgerinc/slp-mint-contracts "tokens with minting schedules") and [SLP Dollars](https://github.com/simpleledgerinc/cashscript/blob/master/examples/slp_dollar.cash "SLP Dollars") that are tokens freezable by the issuer.
 
-### Speculators
+### Investors
 
-Some people have invested into BCH on the premise that it is expected to become peer to peer electronic cash for the world and who expects the token to get adopted in all the same places where money is traditionally used, which includes in financial services.
+There are people and organizations that have invested into the BCH token and ecosystem on the premise that it is expected to become peer to peer electronic cash for the world. Miners are a clear such group who have invested into the ecosystem. These stakeholders expects the token to get adopted in all the same places where money is traditionally used, which includes in financial services.
 
 ## Statements
 
