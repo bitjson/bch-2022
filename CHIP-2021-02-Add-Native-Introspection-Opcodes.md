@@ -201,7 +201,7 @@ There are people and organizations that have invested into the BCH token and eco
 ### [Licho](https://github.com/KarolTrzeszczkowski "Licho")
 > The covenant technology have proven to be a vibrant area of BCH development. It allows us to replicate more and more of traditional banking services in a non-custodial way. The native introspection seems to be the key ingredient of the future of permissionless money.
 
-### Tom Zander — [founder Flowee](https://flowee.org/ "Flowee")
+### Tom Zander — founder [Flowee](https://flowee.org/ "Flowee")
 > This CHIP is super valuable and I fully support the direction this is going in and the ideas behind this chip. I will continue to monitor the progress with enthusiasm.
 
 ## Copyright Notice
