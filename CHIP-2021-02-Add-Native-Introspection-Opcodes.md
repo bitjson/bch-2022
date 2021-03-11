@@ -190,8 +190,13 @@ There are people and organizations that have invested into the BCH token and eco
 
 ## Statements
 
-TBD.
+...
 
+### [General Protocols](https://generalprotocols.com/ "General Protocols")
+> The CHIP requires further analysis and specification before it is possible to take a strong position. GP commits to supporting this CHIP with reasonable resources. GP predicts that the benefits to BCH value and network effect will greatly outweigh the costs. Regarding the multiple implementation options available, GP sees multiple good options and encourages the active CHIP participants to choose one with reasonable logic and zero polarization.
+
+### [p0oker](https://twitter.com/p0oker "p0oker")
+> I believe removing the current work arounds with the addition of native introspection OP Codes can improve the reliability of the smart contracts on Bitcoin Cash. Covenants are important and useful in many business use cases and it’s important to make them bulletproof!
 
 ## Copyright Notice
 
