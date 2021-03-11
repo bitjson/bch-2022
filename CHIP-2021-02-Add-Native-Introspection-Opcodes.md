@@ -198,6 +198,9 @@ There are people and organizations that have invested into the BCH token and eco
 ### [p0oker](https://twitter.com/p0oker "p0oker")
 > I believe removing the current work arounds with the addition of native introspection OP Codes can improve the reliability of the smart contracts on Bitcoin Cash. Covenants are important and useful in many business use cases and it’s important to make them bulletproof!
 
+### [Licho](https://github.com/KarolTrzeszczkowski "Licho")
+> The covenant technology have proven to be a vibrant area of BCH development. It allows us to replicate more and more of traditional banking services in a non-custodial way. The native introspection seems to be the key ingredient of the future of permissionless money.
+
 ## Copyright Notice
 
 Copyright (c) 2021 GeneralProtocols / Research
