@@ -5,9 +5,9 @@
 This proposal updates the Bitcoin Cash scripting language with additional opcodes to natively provide details about the current transaction, such as the output amount and recipients.
 
 > OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
-> 
+>
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
-> 
+>
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
 ## Motivation and Benefits
@@ -20,13 +20,13 @@ In order for Bitcoin Cash to gain adoption as money, it needs to provide similar
 
 - Allows for new usecases to be developed by providing more information on a transaction than the current workaround.
 
-- Allows for larger and more complex contracts by removing 15~25 opcodes¹ and 20~40 bytes¹ used per transaction, compared to current workaround.
+- Allows for larger and more complex contracts by removing at least 11 opcodes¹ and 90~300 bytes¹ used per transaction, compared to current workaround.
 
 - Lowers the network bandwidth and storage costs for the growing number² of introspection transactions.
 
 - Lowers network processing costs by removing one signature verification for the growing number² of introspection transactions.
 
-  ¹ *An optimised preimage validation needs 11 opcodes/bytes (`<preimage> <sig> <pubkey> 2DUP CHECKSIGVERIFY SWAP SIZE 1SUB SPLIT DROP ROT SHA256 ROT CHECKDATASIGVERIFY`) and extracting a single element from the middle (e.g. `hashOutputs`) needs 7 opcodes / 11 bytes (`<preimage> DUP SIZE 40 SUB SPLIT NIP 32 SPLIT DROP`)*. In practice, preimage decoding and verification might be less optimised.
+  ¹ *An optimised preimage validation needs 8 opcodes/10 bytes `<pubkey> <sig> <preimage> 3DUP SHA256 ROT CHECKDATASIGVERIFY DROP <sighashflags> CAT SWAP CHECKSIGVERIFY` and extracting a single element from the middle (e.g. `hashOutputs`) needs 4 opcodes / 8 bytes (`<preimage> <splitindex> SPLIT NIP 32 SPLIT DROP`). A preimage is at least 153 bytes in size (which in some cases can be partially generated using ANYONECANPAY and NUM2BIN, bringing it down to ~90 bytes. This often cannot be used though). Often, however, the preimage of `hashOutputs` is also provided, increasing the used bytes by the size of the serialized outputs*. In practice, preimage decoding and verification might be less optimised.
 
   ² *There is currently ~100,000 such transactions, but introspection could be used for recurring transactions, such as rent, utilities and netflix subscriptions, which could have a dramatic impact on the network scalability.*
 
@@ -36,13 +36,15 @@ To ensure that the outcome of this proposal is clearly beneficial to the long-te
 
 ### Implementation costs and risks
 
-- Native introspection will use up some of the ~60 currently unused opcodes. Depending on implementation detail, this cost might be small (single opcode, templated data) or it might be significant (every transaction data can be accessed through a unique relevant opcode, with an estimated number of 15 ~ 40 opcodes being reserved for introspection).
+- Native introspection will use up 10~20 of the 40 currently unused² opcodes.
 
 - Node software and other services that validate consensus would need to implement the new opcodes.
 
 - A limited¹ number of libraries and developer tools that offer advanced scripting functionality would need to implement the feature.
 
-  ¹ *Wallets, mining pools, exchanges and services does not have to be updated and will continue to function as normal.*
+  ¹ *SPV wallets, mining pools, exchanges and services does not have to be updated and will continue to function as normal.*
+
+  ² *The opcodes in the `0xBD - 0xEF` range are currently unused (32 opcodes), according to [public documentation](https://documentation.cash/protocol/blockchain/script#operation-codes-opcodes). There are also the NOP1 and NOP4-NOP10 opcodes (8 opcodes) which can be used for softforking new features. Finally there is a handful of disabled opcodes that could potentially be used but that we leave out of this calculation for simplicity.
 
 ### Ongoing Costs and Risks
 
@@ -50,7 +52,68 @@ To ensure that the outcome of this proposal is clearly beneficial to the long-te
 
 ## Technical Description
 
-*(This section still needs to be drafted out. It will mostly look like the previous version listed in the alternatives, where there's one or more opcodes and a table of datapoints one could push to the stack. It's unclear if it will be templated or multiple opcodes, concatenated or not and a few other technical details still needs to be worked out.)*
+> **NOTE**: This content of this section is still being determined. The data below is a list of possible things that could, in theory, be included in this proposal. Until a survey has been done among stakeholders as to which items have value, it is a good idea not to get attached to any particular item below.
+
+
+Native Introspection is a set of new opcodes for the BCH virtual machine which provides direct access to elements of the virtual machine’s state during evaluation.
+Each opcode provides information about the current transaction according to the table below.
+
+Word | Value | Hex | Input | Output | Description
+--- | --- | --- | --- | --- | ---
+OP_OUTPOINTTXHASH | 189 | 0xBD |  |  | Push the outpoint transaction hash – the hash of the transaction which created the Unspent Transaction Output (UTXO) of the input being evaluated - to the stack in big-endian byte order.
+OP_OUTPOINTINDEX | 190 | 0xBE |  |  | Push the outpoint index – the index of the Unspent Transaction Output (UTXO) of the input being evaluated – to the stack.
+OP_INPUTINDEX | 191 | 0xBF |  |  | Push the index of the input being evaluated to the stack as a Script Number.
+OP_INPUTSEQUENCENUMBER | 192 | 0xC0 | x | sequence | Pop the top item from the stack as an index (Script Number). Push the sequence number of the input at that index to the stack.
+OP_INPUTBYTECODE | 193 | 0xC1 | x | bytecode | Pop the top item from the stack as an index (Script Number). Push the unlocking bytecode of the input at that index to the stack.
+OP_UTXOBYTECODE | 194 | 0xC2 |  |  | Push the bytecode currently being evaluated to the stack. For standard scripts, this is the locking bytecode of the Unspent Transaction Output (UTXO) spent by the input, for P2SH scripts, the UTXO's redeem script is pushed.
+OP_UTXOVALUE | 195 | 0xC3 |  |  | Push the value (as a Script Number) of the Unspent Transaction Output (UTXO) spent by the input being evaluated.
+OP_OUTPUTBYTECODE | 196 | 0xC4 | x | lockscript | Pop the top item from the stack as an index (Script Number). Push the locking bytecode of the output at that index to the stack.
+OP_OUTPUTVALUE | 197 | 0xC5 | x | outputvalue | Pop the top item from the stack as an index (Script Number). Push the value (in satoshis) of the output at that index to the stack as an 8 byte serialized integer. This can be interpreted as a Script Number by performing `OP_BIN2NUM` as long as the numerical value fits within the Script Number limits (currently <21 BCH).
+OP_TXINPUTCOUNT | 198 | 0xC6 |  |  | Push the number of inputs of the current transaction as a Script Number
+OP_TXOUTPUTCOUNT | 199 | 0xC7 |  |  |  Push the number of outputs of the current transaction as a Script Number
+OP_TXLOCKTIME | 200 | 0xC8 |  |  | Push the locktime of the current transaction as a Script Number
+OP_TXVERSION | 201 | 0xC9 |  |  | Push the version field of the current transaction as a Script Number
+OP_NUM2VARINT | 202 | 0xCA | x | x varint | Pop the top item from the stack as a Script Number. Re-encode the number as a Bitcoin VarInt and push the result.
+OP_VARINT2NUM | 203 | 0xCB | x | x scriptnum | Pop the top item from the stack as a Bitcoin VarInt. Re-encode the number as a Script Number and push the result.
+
+### Aggregated values
+
+*NOTE: The following is not part of jasons initial list, but might be interesting to add.*
+
+Word | Value | Hex | Input | Output | Description
+--- | --- | --- | --- | --- | ---
+OP_TXINPUTVALUE | ? | 0x?? |  |  | Push the total number of satoshis in all inputs of the current transaction as a Script Number?
+OP_TXOUTPUTVALUE | ? | 0x?? |  |  | Push the total number of satoshis in all outputs of the current transaction as a Script Number?
+OP_TXINPUTSTACKITEM | ? | 0x?? | input item |  | Pop the item index and input index from the stack. Push the stack item with the item index pushed by input with index input index to the stack.
+
+### Hashed values
+
+*NOTE: The following is not part of jasons initial list, but might be interesting to add.*
+
+Several state identifiers represent the hash of other state items (Transaction Outpoints Hash, Transaction Sequence Numbers Hash, Corresponding Output Hash, and Transaction Outputs Hash).
+This allows scripts to avoid manually re-hashing the values (e.g. <2> OP_PUSHSTATE OP_HASH256).
+This optimization reduces transaction sizes by eliminating the hashing opcode, incentivizes better performance, and makes performance optimizations easier for implementations.
+
+In most cases, the virtual machine will be required to perform these hash functions during a signature checking operation (with a few exceptions, e.g. Corresponding Output Hash in an input which doesn't utilize "SIGHASH_SINGLE").
+By allowing scripts to request the hashed result directly, scripts are incentivized to avoid harder-to-optimize constructions (e.g. `<2> OP_PUSHSTATE OP_SHA256 OP_SHA256`).
+
+Word | Value | Hex | Input | Output | Description
+--- | --- | --- | --- | --- | ---
+Transaction Sequence Numbers Hash? | ? | 0x?? |  |  | ...
+Corresponding Output Hash? | ? | 0x?? |  |  | ...
+Transaction Outputs Hash? | ? | 0x?? |  |  | ...
+
+### Templated version
+
+*NOTE: The following is not part of jasons initial list, but might be interesting to add.*
+
+At the cost of an additional opcode, it would be possible to push multiple values at the same time, resulting in small scripts.
+This could be particulary useful if you need to use a piece of information more than one time, but in different places, as you could push the same data to both places with the same push.
+
+Word | Value | Hex | Input | Output | Description
+--- | --- | --- | --- | --- | ---
+OP_PUSHSTATE | ? | 0x?? |  |  | Pop the top item from the stack as a state concatenation template. If each byte of the template is recognized, push each identified state value to the stack, otherwise, error.
+
 
 ## Implementations
 
