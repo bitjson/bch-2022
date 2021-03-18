@@ -132,9 +132,13 @@ OP_PUSHSTATE | ? | 0x?? |  |  | Pop the top item from the stack as a state conca
 
 There has been similar proposals in the past that has been used to inform the design of this proposal:
 
-- [Jason Dreyzehner](https://github.com/bitjson) created the [initial OP_PUSHSTATE](https://github.com/bitjson/op-pushstate) proposal. It was a good starting point and much of the work has been carried over to this proposal.
+- [Jason Dreyzehner](https://github.com/bitjson) created the [initial OP_PUSHSTATE](https://github.com/bitjson/op-pushstate) proposal. Using a templated approach with a single opcode that consumed a template bytestring from the stack and returning a concatenated result to the stack. While it had a smaller impact in terms of number of opcodes it required, it was not feasable since different data points required different number of parameters and there was no good usecase for the concatenated results.
 
-- [Tobias Rust](https://github.com/EyeOfPython) made a [multibyte version](https://github.com/slpdex/op-pushstate). _(.. add explanation of why that is not a better proposal ..)_
+- During the development of this proposal, a version was discussed that would be templated but instead of concatenated output, would push each item separately on the stack. It was rejected since a single opcode still would need different parameters for different data points, and the benefit of additional complexity was not deemed more valuable than the cost of using multiple opcodes.
+
+- [Tobias Rust](https://github.com/EyeOfPython) made a [multibyte version](https://github.com/slpdex/op-pushstate). While this would reduce the cost in terms of limited number of opcodes, it would also increase the size of contracts that uses it compared to singlebyte opcodes. It would further introduce additional implementation costs as no other opcode is currently multibyte.
+
+- During the development of this proposal, it has been suggested that one could update the Bitcoin Cash scripting engine to make all opcodes multibyte or multibyte aware, effectively getting access to unlimited opcodes. This proposal is independent, but should the scripting engine get such an update, this proposal is expected to be compatible at low or no cost.
 
 However, any delay or rejection of native introspection support may incur the following costs:
 
