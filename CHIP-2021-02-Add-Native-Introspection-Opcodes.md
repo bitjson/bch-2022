@@ -172,6 +172,8 @@ There are some companies and organizations that are currently building products 
 
 - [Flipstarter](https://flipstarter.cash/ "Flipstarter") was researching funding contracts as a way to improve usability, which may be possible with better introspection.
 
+- [SmartBCH](https://smartbch.org/ "SmartBCH") is building an EVM compatible Bitcoin Cash sidechain, and might use introspection as part of a bridge between the main and side chain.
+
 ### Indepedent Developers
 
 There is a number of independent developers who have an interest in developing tools and services that relies on introspection:
