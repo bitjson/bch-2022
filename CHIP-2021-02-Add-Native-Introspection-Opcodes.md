@@ -1,8 +1,4 @@
-# CHIP - 2021-02 - ADD NATIVE INTROSPECTION OPCODES
-
-## Summary
-
-This proposal updates the Bitcoin Cash scripting language with additional opcodes to natively provide details about the current transaction, such as the output amount and recipients.
+# CHIP-2021-02: Native Introspection Opcodes
 
 > OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
 >
@@ -10,204 +6,305 @@ This proposal updates the Bitcoin Cash scripting language with additional opcode
 >
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
-## Motivation and Benefits
+## Summary
 
-In order for Bitcoin Cash to gain adoption as money, it needs to provide similar or better features than existing alternatives. One area where Bitcoin Cash can be uniquely positioned is as a cost-efficient programmable money. By improving the Bitcoin Cash script with additional opcodes to provide native introspection, we gain the following benefits:
+This proposal adds a set of new virtual machine (VM) operations which enable BCH contracts to efficiently access details about the current transaction like output values, recipients, and more.
 
-- Reduces barrier to entry for new contract developers who no longer have to learn intimate details about transaction signing.
+## Deployment
 
-- Improves contract safety by eliminating the risk of a naively implemented workaround not doing proper verification.
+Deployment of this specification is proposed for the May 2022 upgrade.
 
-- Allows for new usecases to be developed by providing more information on a transaction than the current workaround.
+This proposal does not depend on [`CHIP: Bigger Script Integers`](./CHIP-2021-02-Bigger-Script-Integers.md), but support for larger script numbers is required for all possible results of `OP_UTXOVALUE` to be used in arithmetic operations. It therefore recommended that both CHIPs be deployed together.
 
-- Allows for larger and more complex contracts by removing at least 11 opcodes¹ and 90~300 bytes¹ used per transaction, compared to current workaround.
+This proposal does not depend on [`CHIP PMv3: Version 3 Transaction Format`](https://github.com/bitjson/pmv3), but it has been updated to include full introspection capabilities for the v3 transaction format. See [Interaction with PMv3](#interaction-with-pmv3) for details.
 
-- Lowers the network bandwidth and storage costs for the growing number² of introspection transactions.
+## Motivation
 
-- Lowers network processing costs by removing one signature verification for the growing number² of introspection transactions.
+Since the introduction of OP_CHECKDATASIG (2018-11-15), it has been possible to implement practical Bitcoin Cash **covenants – contracts which validate properties of the transaction in which the contract funds are spent**.
 
-  ¹ *An optimised preimage validation needs 8 opcodes/10 bytes `<pubkey> <sig> <preimage> 3DUP SHA256 ROT CHECKDATASIGVERIFY DROP <sighashflags> CAT SWAP CHECKSIGVERIFY` and extracting a single element from the middle (e.g. `hashOutputs`) needs 4 opcodes / 8 bytes (`<preimage> <splitindex> SPLIT NIP 32 SPLIT DROP`). A preimage is at least 153 bytes in size (which in some cases can be partially generated using ANYONECANPAY and NUM2BIN, bringing it down to ~90 bytes. This often cannot be used though). Often, however, the preimage of `hashOutputs` is also provided, increasing the used bytes by the size of the serialized outputs*. In practice, preimage decoding and verification might be less optimised.
+Covenants enable a wide range of new innovation, but the strategy by which they are currently implemented is extremely inefficient: most of a transactions contents must be duplicated for each input which utilizes a covenant. In practice, this doubles or triples the size of even the simplest covenant transactions<sup>1</sup>, and advanced covenant applications quickly exceed VM limits such as the maximum standard unlocking bytecode length (A.K.A. `MAX_TX_IN_SCRIPT_SIG_SIZE`) of 1,650 bytes. This severely limits the extent of current BCH covenant development and usage.
 
-  ² *There is currently ~100,000 such transactions, but introspection could be used for recurring transactions, such as rent, utilities and netflix subscriptions, which could have a dramatic impact on the network scalability.*
+> Covenants are currently implemented using a workaround in which the same signature is checked by both `OP_CHECKSIG` and `OP_CHECKDATASIG`. The `OP_CHECKSIG` confirms the signature is valid for the current transaction, and the `OP_CHECKDATASIG` allows the contract to validate that the signature covers a particular preimage provided in the unlocking bytecode. If both checks are successful, the contract can trust that the preimage provided to `OP_CHECKDATASIG` is the genuine signing serialization of the current transaction. By further inspecting this preimage, the contract can validate other properties of the transaction.
 
-## Costs and Risks
+<details>
+<summary><b>Calculations</b></summary>
 
-To ensure that the outcome of this proposal is clearly beneficial to the long-term value of Bitcoin Cash the following costs have been taking into consideration and have been deemed acceptable:
+1. An optimized implementation of the `OP_CHECKSIG` + `OP_CHECKDATASIG` workaround (`<public_key> <signature> <preimage> OP_3DUP OP_SHA256 OP_ROT OP_CHECKDATASIGVERIFY OP_DROP <sighash_flags> OP_CAT OP_SWAP OP_CHECKSIGVERIFY`) requires at least 12 bytes of operations, a 33-byte public key, a 65 to 73-byte signature, and a [signing serialization preimage which is typically at least 188 bytes](https://github.com/bitcoincashorg/bitcoincash.org/blob/3e2e6da8c38dab7ba12149d327bc4b259aaad684/spec/replay-protected-sighash.md#digest-algorithm). In total, this construction is expected to require at least 298 bytes per covenant input. For some contracts, the preimage can be partially generated using `SIGHASH_ANYONECANPAY` and `OP_NUM2BIN`, theoretically reducing the preimage size to ~90 bytes and bringing the minimum possible overhead to ~200 bytes.
 
-### Implementation costs and risks
+</details>
 
-- Native introspection will use up 10~20 of the 40 currently unused² opcodes.
+## Benefits
 
-- Node software and other services that validate consensus would need to implement the new opcodes.
+Adding native support for introspection operations would make covenants simpler, safer, and more efficient, enabling innovative new use cases.
 
-- A limited¹ number of libraries and developer tools that offer advanced scripting functionality would need to implement the feature.
+### Simpler, Safer Contracts
 
-  ¹ *SPV wallets, mining pools, exchanges and services does not have to be updated and will continue to function as normal.*
+While contracts using the current covenant workaround must carefully validate all provided transaction information, contracts using native introspection operations could safely rely on information returned by the VM without further validation. This significantly reduces contract size and complexity, making contract development and security review easier.
 
-  ² *The opcodes in the `0xBD - 0xEF` range are currently unused (32 opcodes), according to [public documentation](https://documentation.cash/protocol/blockchain/script#operation-codes-opcodes). There are also the NOP1 and NOP4-NOP10 opcodes (8 opcodes) which can be used for softforking new features. Finally there is a handful of disabled opcodes that could potentially be used but that we leave out of this calculation for simplicity.
+### Reduced Transaction Sizes
 
-### Ongoing Costs and Risks
+By eliminating the need for a wasteful double-signature checking workaround, covenant transaction sizes can be reduced by hundreds of bytes, making them as efficient as other common transaction types. This would reduce wasted network bandwidth and lower transaction fees for all covenant applications.
 
-- Adding native introspection could increase complexity for any future technical changes to the Bitcoin Cash transaction format.
+Because covenant applications cover a large variety of common transaction types – including scheduled and recurring payments – improved efficiency in covenant transactions would significantly improve overall throughput of the BCH network.
 
-## Technical Description
+### Enable Innovation
 
-> **NOTE**: This content of this section is still being determined. The data below is a list of possible things that could, in theory, be included in this proposal. Until a survey has been done among stakeholders as to which items have value, it is a good idea not to get attached to any particular item below.
+By eliminating waste in covenant contracts, native introspection operations can extend the scope of possible applications which can be developed within current VM limits. This would enable far more innovation on Bitcoin Cash, without increasing node validation costs.
 
+## Costs & Risk Mitigation
 
-Native Introspection is a set of new opcodes for the BCH virtual machine which provides direct access to elements of the virtual machine’s state during evaluation.
-Each opcode provides information about the current transaction according to the table below.
+The following costs and risks have been assessed.
 
-Word | Value | Hex | Input | Output | Description
---- | --- | --- | --- | --- | ---
-OP_OUTPOINTTXHASH | 189 | 0xBD |  |  | Push the outpoint transaction hash – the hash of the transaction which created the Unspent Transaction Output (UTXO) of the input being evaluated - to the stack in big-endian byte order.
-OP_OUTPOINTINDEX | 190 | 0xBE |  |  | Push the outpoint index – the index of the Unspent Transaction Output (UTXO) of the input being evaluated – to the stack.
-OP_INPUTINDEX | 191 | 0xBF |  |  | Push the index of the input being evaluated to the stack as a Script Number.
-OP_INPUTSEQUENCENUMBER | 192 | 0xC0 | x | sequence | Pop the top item from the stack as an index (Script Number). Push the sequence number of the input at that index to the stack.
-OP_INPUTBYTECODE | 193 | 0xC1 | x | bytecode | Pop the top item from the stack as an index (Script Number). Push the unlocking bytecode of the input at that index to the stack.
-OP_UTXOBYTECODE | 194 | 0xC2 |  |  | Push the full bytecode currently being evaluated to the stack, unaffected by any OP_SEPARATOR interactions. For standard scripts, this is the locking bytecode of the Unspent Transaction Output (UTXO) spent by the input, for P2SH scripts, the UTXO's redeem script is pushed.
-OP_UTXOVALUE | 195 | 0xC3 |  |  | Push the value (as a Script Number) of the Unspent Transaction Output (UTXO) spent by the input being evaluated.
-OP_OUTPUTBYTECODE | 196 | 0xC4 | x | lockscript | Pop the top item from the stack as an index (Script Number). Push the locking bytecode of the output at that index to the stack.
-OP_OUTPUTVALUE | 197 | 0xC5 | x | outputvalue | Pop the top item from the stack as an index (Script Number). Push the value (in satoshis) of the output at that index to the stack as an 8 byte serialized integer. This can be interpreted as a Script Number by performing `OP_BIN2NUM` as long as the numerical value fits within the Script Number limits (currently <21 BCH).
-OP_TXINPUTCOUNT | 198 | 0xC6 |  |  | Push the number of inputs of the current transaction as a Script Number
-OP_TXOUTPUTCOUNT | 199 | 0xC7 |  |  |  Push the number of outputs of the current transaction as a Script Number
-OP_TXLOCKTIME | 200 | 0xC8 |  |  | Push the locktime of the current transaction as a Script Number
-OP_TXVERSION | 201 | 0xC9 |  |  | Push the version field of the current transaction as a Script Number
-OP_NUM2VARINT | 202 | 0xCA | x | x varint | Pop the top item from the stack as a Script Number. Re-encode the number as a Bitcoin VarInt and push the result.
-OP_VARINT2NUM | 203 | 0xCB | x | x scriptnum | Pop the top item from the stack as a Bitcoin VarInt. Re-encode the number as a Script Number and push the result.
+### Node Upgrade Costs
 
-### Aggregated values
+This proposal affects consensus – all fully-validating node software must implement these VM changes to remain in consensus.
 
-*NOTE: The following is not part of jasons initial list, but might be interesting to add.*
+> These VM changes are backwards-compatible: all past and currently-possible transactions remain valid under these new rules.
 
-Word | Value | Hex | Input | Output | Description
---- | --- | --- | --- | --- | ---
-OP_TXINPUTVALUE | ? | 0x?? |  |  | Push the total number of satoshis in all inputs of the current transaction as a Script Number?
-OP_TXOUTPUTVALUE | ? | 0x?? |  |  | Push the total number of satoshis in all outputs of the current transaction as a Script Number?
-OP_TXINPUTSTACKITEM | ? | 0x?? | input item |  | Pop the item index and input index from the stack. Push the stack item with the item index pushed by input with index input index to the stack.
+### Other Software Upgrade Costs
 
-### Hashed values
+While most wallets, indexers, and other software will not require updates to support this proposal (beyond upgrades to any supporting node infrastructure), updates will be required to some libraries, transaction compilers, and other software which implements the BCH VM (e.g. [Bitauth IDE](https://github.com/bitauth/bitauth-ide)).
 
-*NOTE: The following is not part of jasons initial list, but might be interesting to add.*
+### Assignment of Opcodes
 
-Several state identifiers represent the hash of other state items (Transaction Outpoints Hash, Transaction Sequence Numbers Hash, Corresponding Output Hash, and Transaction Outputs Hash).
-This allows scripts to avoid manually re-hashing the values (e.g. <2> OP_PUSHSTATE OP_HASH256).
-This optimization reduces transaction sizes by eliminating the hashing opcode, incentivizes better performance, and makes performance optimizations easier for implementations.
+The specified operations would occupy 15 codepoints within the BCH VM instruction set. This represents a notable portion of the remaining 81 unused codepoints (80, 98, 101, 102, 137, 138, 176, 179-185, 189-255). However, we consider this to be a [prudent use of these codepoints](#use-of-single-byte-opcodes).
 
-In most cases, the virtual machine will be required to perform these hash functions during a signature checking operation (with a few exceptions, e.g. Corresponding Output Hash in an input which doesn't utilize "SIGHASH_SINGLE").
-By allowing scripts to request the hashed result directly, scripts are incentivized to avoid harder-to-optimize constructions (e.g. `<2> OP_PUSHSTATE OP_SHA256 OP_SHA256`).
+## Technical Specification
 
-Word | Value | Hex | Input | Output | Description
---- | --- | --- | --- | --- | ---
-Transaction Sequence Numbers Hash? | ? | 0x?? |  |  | ...
-Corresponding Output Hash? | ? | 0x?? |  |  | ...
-Transaction Outputs Hash? | ? | 0x?? |  |  | ...
+A range of Bitcoin Cash VM codepoints is reserved for transaction introspection operations – `0xc0` (192) through `0xcf` (207) – and a new set of 15 operations allows contracts to introspect all available transaction and evaluation state.
 
-### Templated version
+### Nullary Operations
 
-*NOTE: The following is not part of jasons initial list, but might be interesting to add.*
+The following 6 operations consume no items and push a single result to the stack.
 
-At the cost of an additional opcode, it would be possible to push multiple values at the same time, resulting in small scripts.
-This could be particulary useful if you need to use a piece of information more than one time, but in different places, as you could push the same data to both places with the same push.
+| Operation         | Codepoint         | Description                                                                                                                                                                                                                                                                                          |
+| ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP_INPUTINDEX     | `0xc0`&nbsp;(192) | Push the index of the input being evaluated to the stack as a Script Number.                                                                                                                                                                                                                         |
+| OP_ACTIVEBYTECODE | `0xc1`&nbsp;(193) | Push the full bytecode currently being evaluated to the stack<sup>1</sup>. For Pay-to-Script-Hash (P2SH) evaluations, this is the redeem bytecode of the Unspent Transaction Output (UTXO) being spent; for all other evaluations, this is the locking bytecode of the UTXO being spent.<sup>2</sup> |
+| OP_TXVERSION      | `0xc2`&nbsp;(194) | Push the version of the current transaction to the stack as a Script Number.                                                                                                                                                                                                                         |
+| OP_TXINPUTCOUNT   | `0xc3`&nbsp;(195) | Push the count of inputs in the current transaction to the stack as a Script Number.                                                                                                                                                                                                                 |
+| OP_TXOUTPUTCOUNT  | `0xc4`&nbsp;(196) | Push the count of outputs in the current transaction to the stack as a Script Number.                                                                                                                                                                                                                |
+| OP_TXLOCKTIME     | `0xc5`&nbsp;(197) | Push the locktime of the current transaction to the stack as a Script Number.                                                                                                                                                                                                                        |
 
-Word | Value | Hex | Input | Output | Description
---- | --- | --- | --- | --- | ---
-OP_PUSHSTATE | ? | 0x?? |  |  | Pop the top item from the stack as a state concatenation template. If each byte of the template is recognized, push each identified state value to the stack, otherwise, error.
+1. `OP_CODESEPARATOR` has no effect on the result of `OP_ACTIVEBYTECODE`; `OP_ACTIVEBYTECODE` always pushes the full, serialized bytecode for the instructions currently under evaluation. (In the Satoshi implementation, this is simply the `CScript` contents passed to the current `EvalScript`.)
+2. This behavior matches the existing behavior of the BCH VM during P2SH evaluation – once the P2SH pattern is matched, the remaining stack is copied, and the VM begins evaluation again with the P2SH redeem bytecode set as the new `active bytecode`. (In the Satoshi implementation, this P2SH redeem bytecode is passed as a `CScript` to a new execution of `EvalScript`.)
 
+### Unary Operations
+
+The following 9 operations pop the top item from the stack as an index (Script Number) and push a single result to the stack. If the consumed value is not a valid index for the operation, an error is produced.
+
+| Operation                    | Codepoint         | Description                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP_UTXOVALUE                 | `0xc6`&nbsp;(198) | Pop the top item from the stack as an input index (Script Number). Push the value (in satoshis) of the Unspent Transaction Output (UTXO) spent by that input to the stack as a Script Number.                                                                                      |
+| OP_UTXOBYTECODE              | `0xc7`&nbsp;(199) | Pop the top item from the stack as an input index (Script Number). Push the full locking bytecode of the Unspent Transaction Output (UTXO) spent by that input to the stack.                                                                                                       |
+| OP_OUTPOINTTXHASH            | `0xc8`&nbsp;(200) | Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint transaction hash – the hash of the transaction which created the Unspent Transaction Output (UTXO) which is being spent – to the stack in big-endian byte order<sup>1</sup>. |
+| OP_OUTPOINTINDEX             | `0xc9`&nbsp;(201) | Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint index – the index of the output in the transaction which created the Unspent Transaction Output (UTXO) which is being spent – to the stack as a Script Number.               |
+| OP_INPUTBYTECODE             | `0xca`&nbsp;(202) | Pop the top item from the stack as an input index (Script Number). Push the unlocking bytecode of the input at that index to the stack. (If the selected input uses a detached proof, the pushed value is the unlocking bytecode content of the detached proof.)<sup>2</sup>       |
+| OP_INPUTSEQUENCENUMBER       | `0xcb`&nbsp;(203) | Pop the top item from the stack as an input index (Script Number). Push the sequence number of the input at that index to the stack as a Script Number.                                                                                                                            |
+| OP_OUTPUTVALUE               | `0xcc`&nbsp;(204) | Pop the top item from the stack as an output index (Script Number). Push the value (in satoshis) of the output at that index to the stack as a Script Number.                                                                                                                      |
+| OP_OUTPUTBYTECODE            | `0xcd`&nbsp;(205) | Pop the top item from the stack as an output index (Script Number). Push the locking bytecode of the output at that index to the stack.                                                                                                                                            |
+| OP_INPUTDETACHED<sup>3</sup> | `0xce`&nbsp;(206) | Pop the top item from the stack as an input index (Script Number). If the input at that index uses a detached proof, push `1` (`0x01`), otherwise push `0` (`0x`, the empty item).                                                                                                 |
+
+1. By specification, the output of the SHA-256 hashing function is [considered to be in big-endian byte order](https://en.wikipedia.org/wiki/Comparison_of_cryptographic_hash_functions#Compression_function). In practice, this is the byte order produced by most libraries, and also the order produced/required by all BCH VM operations which employ SHA-256. For reference, the SHA-256 hash of an empty byte array in big-endian byte order is `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. (Note, the P2P transaction format encodes this value in the opposite, little-endian order.)
+2. This clarification to `OP_INPUTBYTECODE` is only relevant if this proposal is adopted with or after PMv3.
+3. This operation must only be included if this proposal is adopted with or after PMv3. See [Interaction with PMv3](#interaction-with-pmv3) for details.
+
+## Rationale
+
+This section documents design decisions made in this specification.
+
+### Ordering Operations by Arity
+
+This proposal groups new introspection operations by [arity](https://en.wikipedia.org/wiki/Arity): all operations which consume no stack values precede all operations which consume an index value from the stack.
+
+This simplifies some implementations, allowing operations of like arities to more easily reuse logic. For example, in the Satoshi implementation, all unary numeric operations are [handled in the same fallthrough switch case](https://github.com/bitcoin-cash-node/bitcoin-cash-node/blob/8d6a597bb4d12824b2eb9a8a42708979a5395099/src/script/interpreter.cpp#L716-L727), allowing each operation to reuse the same stack pop and error handling logic.
+
+Beyond arity, operations are arranged within the instruction set to match the order in which their results appear within the P2P transaction format.
+
+### Operation Set Completeness
+
+The operations specified in this proposal expose the most raw form of every static property of transaction and evaluation state within the current VM model.
+
+This strategy necessarily incorporates operations which may initially seem to duplicate existing functionality, notably `OP_TXLOCKTIME` and `OP_INPUTSEQUENCENUMBER` (many use cases for these operations can also be accomplished using the existing `OP_CHECKLOCKTIMEVERIFY` and `OP_CHECKSEQUENCEVERIFY`, respectively). However, contract authors are not always able to reverse the order of a construction to make use of these operations. This limitation is particularly acute in covenant use cases: where other limitations prevent a contract from inverting a construction (or even providing the expected result of that operation via unlocking bytecode), some use cases are likely impossible without these functionally-similar introspection operations.
+
+> Notably, the existing instruction set includes `OP_SUB` even though `OP_ADD` can be indirectly used (backwards) to accomplish many of the same validations. The existence of inverse and functionally-similar operations is important for both accommodating new use cases and optimizing contracts.
+
+By implementing introspection in a single deployment as a complete, logical set of operations – rather than by piecemeal activation as contract authors lobby for operations which are important for their use cases – we allow new innovation to take place primarily in "userspace" and limit future technical debt.
+
+> Note: introspection of dynamic VM state – like current instruction pointer index, last `OP_CODESEPARATOR` index, the current state of various cumulative limits, etc. – is intentionally excluded from this specification.
+>
+> This approach avoids consensus standardization of various implementation details which could complicate some implementations and requires further research and justification. Instead, this proposal incorporates only introspection operations for previously consensus-standardized, static properties of transaction and evaluation state which are already available to contracts via the `OP_CHECKSIG` + `OP_CHECKDATASIG` hack.
+
+### Differences Between `OP_ACTIVEBYTECODE` and `OP_INPUTINDEX OP_UTXOBYTECODE`
+
+The operations specified in this proposal include partially-overlapping functionality in one rare case: the results of `OP_ACTIVEBYTECODE` and `OP_INPUTINDEX OP_UTXOBYTECODE` are equal in non-P2SH contracts (i.e. spending the output of a non-standard transaction). However, in the more common (standard) P2SH case, `OP_ACTIVEBYTECODE` produces the raw redeem bytecode, while `OP_INPUTINDEX OP_UTXOBYTECODE` will produce only the already-hashed result in the P2SH-template locking bytecode (`OP_HASH160 OP_PUSHBYTES_20 <redeem_bytecode_hash> OP_EQUAL`). This distinction is very important in covenant applications: even in simple cases, it can save many hundreds of bytes by avoiding the need to push a duplicate copy of the covenant's redeem bytecode (to construct the covenant's next output). While `OP_ACTIVEBYTECODE` is very cheap for the VM (typically a simple buffer copy), this single optimization reduces many covenant sizes by 50% or more.
+
+> To demonstrate, the following script produces a `1` for P2SH contracts, but a `0` for non-P2SH contracts (spending a non-standard transaction): `<OP_HASH160 OP_PUSHBYTES_20> OP_ACTIVEBYTECODE OP_HASH160 <OP_EQUAL> OP_CAT OP_CAT OP_INPUTINDEX OP_UTXOBYTECODE OP_EQUAL`.
+
+Alternatively, this same functionality could be provided by modifying `OP_UTXOBYTECODE` to only return the "active" bytecode of each UTXO (i.e. for P2SH contracts, only the raw redeem bytecode), but this would require a significantly more complex implementation: a transaction's inputs would need to be evaluated in two phases, caching each P2SH input's redeem bytecode for access by other inputs where needed. Additionally, information would still be lost unless another introspection operation were made available for contracts to judge which inputs spend a P2SH UTXO (e.g. a unary `OP_ISP2SH`).
+
+An advantage of that more complex solution over the proposed `OP_ACTIVEBYTECODE` solution could be more efficient access to the raw redeem bytecode of sibling inputs (other than the "active" one). While this might be useful in optimizing some highly-advanced covenants, the proposed solution offers a far simpler consensus implementation and slightly more efficient contracts in the common case (1-byte `OP_ACTIVEBYTECODE` vs. 2-byte `OP_INPUTINDEX OP_UTXOBYTECODE`).
+
+> The complexity of this issue ultimately stems from the implementation chosen for [BIP16/P2SH](https://github.com/bitcoin/bips/blob/master/bip-0016.mediawiki), which bifurcated VM evaluation into two modes: standard and P2SH. This complicated the operational model of the VM and is particularly disruptive to the logical consistency of introspection operations between the two modes. The chosen solution focuses on simplicity and optimizing the most common cases, rather than a more complex solution which might optimize more cases. If usage of sibling redeem bytecode becomes common in real world applications, future upgrades could offer more targeted optimizations for those cases.
+
+### Introspection Operation Range
+
+This proposal leaves a 3 codepoint gap between the last defined operation in the current BCH instruction set (`OP_REVERSEBYTES`, `0xbc`/`188`) and the beginning of the proposed introspection operation range (`OP_INPUTINDEX`, `0xc0`/`192`).
+
+This breaks from the recent precedent (since Nov. 2018) of adding each new opcode at the next-available codepoint. (After `OP_NOP10`/`0xb9`, `OP_CHECKDATASIG`/`0xba`, `OP_CHECKDATASIGVERIFY`/`0xbb`, and `OP_REVERSEBYTES`/`0xbc` were appended to the ISA in activation order, rather than being grouped logically with similar operations). While this may appear to complicate logic for detecting invalid codepoints (from `op > FIRST_UNDEFINED_OP_VALUE` to `isUndefined(op)`), it is equivalent in practice, as validators are optimized for evaluating valid bytecode (the common case). For example, in the Satoshi implementation, a switch statement is used to switch between valid operations – invalid opcodes only return their error after the VM iterates through the full list of possible valid opcodes.
+
+By leaving gaps in the ISA, future upgrades may group similar operations nearer to each other. **In the long term, this may produce a more coherent ISA than one ordered only by opcode activation time.**
+
+In the context of this proposal, the proposed gap offers up to 3 codepoints for use either by formatting operations (logically grouped with `OP_REVERSEBYTES`) or for use by additional nullary introspection operations (if the VM model is extended to incorporate new transaction-level primitives or metadata). Likewise, the 2 remaining codepoints within the introspection range (`0xce` and `0xcf`) provide space for additional unary introspection operations.
+
+### Exclusion of Aggregation Operations
+
+With [the partial exception of `OP_ACTIVEBYTECODE`](#differences-between-op_activebytecode-and-op_inputindex-op_utxobytecode), this proposal includes only operations which expose raw state – derived state must be computed using other VM operations. While this simplifies the proposal to a clearly defined set of "primitive" operations, certain useful, derived state elements are not yet possible to compute in all cases. For example, since the VM does not include any construction for looping or iteration, aggregate values like "total input value" and "total output value" are not always possible for contracts to compute.
+
+While it would be possible to define aggregate operations like `OP_TXINPUTVALUE` and `OP_TXOUTPUTVALUE` to make this derived state accessible to all contracts, this proposal considers standardization of any derived state to be premature. Even with piecemeal implementation of some derived state operations, some important types of aggregated/derived state cannot be reasonably standardized, e.g. "public keys referenced by all P2PKH outputs". For contracts to support extracting this information, it's necessary to add support for generalized loops/iteration to the VM.
+
+For this reason, this proposal does not include any aggregate operations; contract authors should instead look to proposals like [`CHIP: Bounded Looping Operations`](https://github.com/bitjson/bch-loops) for this support.
+
+> With [`CHIP: Bounded Looping Operations`](https://github.com/bitjson/bch-loops), a `OP_TXINPUTVALUE` equivalent would require only 14 bytes:
+>
+> ```
+> <0> <0>
+> OP_BEGIN                                  // loop (re)starts with index, value
+>   OP_OVER OP_UTXOVALUE OP_ADD             // Add UTXO value to total
+>   OP_SWAP OP_1ADD OP_SWAP                 // increment index
+>   OP_OVER OP_TXINPUTCOUNT OP_LESSTHAN     // loop until index >= input count (0, 1, 2, and 3)
+> OP_UNTIL
+> OP_NIP                                    // drop index, leaving sum of UTXO values
+> ```
+
+While not included in this proposal, future proposals may introduce aggregate operations either as a partial alternative to looping operations or as an optimization strategy for common aggregations.
+
+### Interaction with PMv3
+
+The [PMv3 version 3 transaction format proposal](https://github.com/bitjson/pmv3) would add two fields which don't yet exist in the v1/v2 transaction formats: [`detached signatures`](https://github.com/bitjson/pmv3#detached-signatures) and [`detached proofs`](https://github.com/bitjson/pmv3#detached-proofs). If adopted with PMv3, this proposal recommends only one additional introspection operation (`OP_INPUTDETACHED`).
+
+Detached signatures are themselves inherently reusable across multiple inputs – rather than a specialized introspection operation, many use cases can reference a particular detached signature directly. Also, because all detached signature-covered transaction elements are themselves natively introspectable, there's little value in an operation which makes the `OP_CHECKSIG` + `OP_CHECKDATASIG` workaround more efficient for detached signatures. As such, **this proposal does not recommend any new introspection operation(s) for detached signatures**.
+
+Detached proofs add only one new bit of information: whether or not each input is detached (`true` or `false`). Access to this information is valuable to many public covenants; if a covenant requires proofs to be detached for transaction sizes to be kept in check, the covenant needs to prevent malicious users from interacting with the covenant using transactions with non-detached proofs (leading to increased covenant transaction costs and even disabling of poorly-designed public covenants).
+
+**To allow inspection of this information, the `OP_INPUTDETACHED` unary operation is proposed**, and the `OP_INPUTBYTECODE` operation is clarified: `(If the selected input uses a detached proof, the pushed value is the unlocking bytecode content of the detached proof.)`.
+
+This strategy makes validation of transaction shapes trivial: `OP_INPUTINDEX OP_INPUTDETACHED OP_VERIFY` would ensure that the current contract is using a detached proof. It also maintains a consistent behavior for `OP_INPUTBYTECODE` (for both detached and standard proofs) – the pushed results of `OP_INPUTBYTECODE` would always be the unlocking bytecode regardless of whether or not the proof is detached.
+
+> Note, the un-hashed result of `OP_INPUTBYTECODE` is most useful to practical contracts, but it's also trivial to reproduce any `detached proof hash` under this scheme: `<N> OP_INPUTBYTECODE OP_HASH256`.
+
+<details>
+<summary>No-operation alternative</summary>
+
+Alternatively, it could be possible to avoid introducing a new `OP_INPUTDETACHED` operation at the cost of significantly increased contract complexity. Under this scheme, the `OP_INPUTBYTECODE` operation could instead be modified to push the `detached proof hash` for inputs which use detached proofs.
+
+While this configuration would technically expose all transaction information, verifying the detached-ness of any particular input would not be trivial, and reviewing contracts for security would become more difficult.
+
+In some cases, the size of the unlocking bytecode could simply be validated: `OP_INPUTBYTECODE OP_SIZE <32> OP_EQUAL`. If it can be guaranteed that no raw unlocking bytecode values of exactly 32-bytes exist for a particular input, this may be sufficient to guarantee that said input is detached. Otherwise, the contract will also be required to validate that a double SHA-256 preimage exists which equals the value returned by `OP_INPUTBYTECODE`. This comprehensively-secure solution would require duplicating the contents of the unlocking bytecode for each validated input, significantly increasing transaction sizes.
+
+Finally, this solution would break the logical consistency of `OP_INPUTBYTECODE` – contracts which depend on the ability to introspect unlocking bytecode would require careful logic to identify whether or not the value returned by `OP_INPUTBYTECODE` is actually unlocking bytecode rather than the hash of that input's unlocking bytecode. In some cases, this may open contracts to vulnerabilities in which carefully "mined" detached proof hashes could deceive the contract into believing a poorly-validated detached proof hash is raw unlocking bytecode.
+
+While this alternative strategy would save a codepoint in the BCH instruction set, it would significantly increase contract complexity, security review costs, and transaction costs. Therefore, this proposal recommends implementation of the simpler `OP_INPUTDETACHED` operation.
+
+</details>
+
+### Use of Single-Byte Opcodes
+
+Earlier proposals attempted to use fewer opcodes by either [introducing all introspection operations as a single opcode](https://github.com/bitjson/op-pushstate) or by [introducing multi-byte opcodes](https://github.com/bitjson/op-pushstate/pull/1). However, [deeper analysis](https://bitcoincashresearch.org/t/bitcoin-script-multi-byte-opcodes/347/5) indicates that the BCH instruction set [might never reach 255 operations](https://bitcoincashresearch.org/t/bitcoin-script-multi-byte-opcodes/347/9) within the current VM model (future VM models are likely to have their own independent set of operations, rather than naively extending the current instruction set).
+
+While it is likely wise to reserve both the remaining `OP_NOP4`-`OP_NOP10` range and the range from `0xf0` to `0xff` for future multi-byte opcodes (leaving room for ~6000 2-byte opcodes), jumping to multi-byte opcodes would be a premature optimization, with uncertain future benefit and immediate negative consequences.
+
+As such – and because introspection operations are critical to all covenant use cases – this proposal specifies the proposed operations as standard, single-byte opcodes.
+
+### Push-Only Limitation of Unlocking Bytecode
+
+For clarity, this proposal does not modify the existing limitation (present since [BCH_2018-11-15](https://documentation.cash/protocol/forks/hf-20181115#push-only)) preventing transactions from including "non-push" operations – all operations at codepoints greater than 96 (`0x60`) – in unlocking bytecode. This limitation also prevents all operations specified in this proposal from appearing in unlocking bytecode.
+
+This limitation is maintained to prevent a third-party malleability vector: any non-push operation can be replaced in a malleated transaction with an equivalent push operation pushing the computed result of the non-push operation. While all third-party malleability vectors would be eliminated by [PMv3's detached signatures](hhttps://github.com/bitjson/pmv3#comprehensive-malleability-protection), this CHIP leaves any loosening of the non-push limitation to future proposals.
 
 ## Implementations
 
-- [Andrew stone](https://github.com/gandrewstone) have implemented similar features on his [next-chain testnet](http://nextchain.cash/).
-- [Jason Dreyzehner](https://github.com/bitjson) has implemented similar features in his bitcoin VM library.
-
-### Specification
-
-*(Specification will be provided after a few remaining design choices have been finalized)*
+- [Bitcoin Cash Node (BCHN) Merge Request 1208](https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node/-/merge_requests/1208)
 
 ### Test Cases
 
-*(Test cases will be provided after a few remaining design choices have been finalized)*
+_(in progress)_
 
 ## Evaluation of Alternatives
 
-There has been similar proposals in the past that has been used to inform the design of this proposal:
+No alternative native introspection proposals are currently public, but alternative designs for several components of this proposal have been documented in the [Rationale](#rationale) section.
 
-- [Jason Dreyzehner](https://github.com/bitjson) created the [initial OP_PUSHSTATE](https://github.com/bitjson/op-pushstate) proposal. Using a templated approach with a single opcode that consumed a template bytestring from the stack and returning a concatenated result to the stack. While it had a smaller impact in terms of number of opcodes it required, it was not feasable since different data points required different number of parameters and there was no good usecase for the concatenated results.
+Several past proposals have informed the design of this proposal:
 
-- During the development of this proposal, a version was discussed that would be templated but instead of concatenated output, would push each item separately on the stack. It was rejected since a single opcode still would need different parameters for different data points, and the benefit of additional complexity was not deemed more valuable than the cost of using multiple opcodes.
+- The [initial `OP_PUSHSTATE`](https://github.com/bitjson/op-pushstate) proposal used a single opcode and templated approach. (The proposal [was withdrawn](https://bitcoincashresearch.org/t/chip-2021-02-add-native-introspection-opcodes/307/15) in favor of this CHIP.)
+- An [implementation of a closely-related `OP_PUSH_TX_STATE`](http://nextchain.cash/op_push_tx_state) exists for the Bitcoin Unlimited node software in the NextChain project.
+- A [multi-byte fork of the `OP_PUSHSTATE` proposal](https://github.com/bitjson/op-pushstate/pull/1) introduced the idea of [unary operations which select information by input/output index](https://github.com/bitjson/op-pushstate/pull/1#issuecomment-564072859).
 
-- [Tobias Rust](https://github.com/EyeOfPython) made a [multibyte version](https://github.com/slpdex/op-pushstate). While this would reduce the cost in terms of limited number of opcodes, it would also increase the size of contracts that uses it compared to singlebyte opcodes. It would further introduce additional implementation costs as no other opcode is currently multibyte.
+Delay or rejection of this proposal may incur the following costs:
 
-- During the development of this proposal, it has been suggested that one could update the Bitcoin Cash scripting engine to make all opcodes multibyte or multibyte aware, effectively getting access to unlimited opcodes. This proposal is independent, but should the scripting engine get such an update, this proposal is expected to be compatible at low or no cost.
-
-However, any delay or rejection of native introspection support may incur the following costs:
-
-- Continued use of the inefficient workaround makes the blockchain larger than it needs to be and could have a negative impact on initial block download times and storage requirements.
-
-- Requirement to use a difficult technical workaround in order to achieve transaction introspection could result in loss of opportunity as development costs and barrier to entry remains high.
-
-- Complexity of the technical workaround in order to achieve transaction introspection could result in otherwise successful businesses having technical problems with their implementation that results in loss of profits and damages reputation of both the company and Bitcoin Cash as a network.
-
-- Some applications and usecases are not possible with the workaround but depending on technical implementation details may be possible with native introspection, not serving these usecases on BCH might result in competitors building these products and gaining theses users instead.
-
-## Security considerations
-
-*(This depends on some specific design choices that has not yet been finalized)*
+- Continued use of the inefficient workaround increases the size of the blockchain could negatively impact initial block download times and storage requirements.
+- The complexity of the current workaround increases development costs and raises the barrier to entry for new developers.
+- Because the current workaround is difficult to implement securely, implementation problems could result in loss of profits and reputational damage, both for the implementing company and the Bitcoin Cash ecosystem.
+- Some applications and use cases will be impossible without native introspection, and competitors may outcompete for these users.
 
 ## List of major stakeholders
 
-There is at least three major stakeholder groups:
+At least three major stakeholder groups exist:
 
 ### Companies and Organizations
 
-There are some companies and organizations that are currently building products that utilize introspection:
+Companies and organizations currently building products utilizing introspection include:
 
-- [General Protocols](https://generalprotocols.com/ "General Protocols") made [AnyHedge](https://anyhedge.com/ "AnyHedge"), a volatility risk-trading contract and are looking to build more non-custodial services and can enable more usecases with better introspection.
+- [General Protocols](https://generalprotocols.com/ 'General Protocols') made [AnyHedge](https://anyhedge.com/ 'AnyHedge'), a volatility risk-trading contract. They plan to build additional, non-custodial services and can support additional functionality with native introspection.
 
-- [Tobias Ruck](https://twitter.com/TobiasRuck/ "Tobias Ruck") created [be.cash](https://be.cash/ "be.cash"), a refillable, offline wallet in the form of a credit card.
+- [Tobias Ruck](https://twitter.com/TobiasRuck/ 'Tobias Ruck') created [be.cash](https://be.cash/ 'be.cash'), a refillable, offline wallet in the form of a credit card.
 
-- [Casues Cash](https://causes.cash/ "Casues Cash") built an modified Mecenas to support recurring payments in USD.
+- [Casues Cash](https://causes.cash/ 'Casues Cash') built a modified Mecenas to support recurring payments in USD.
 
-- [Mistcoin](https://mistcoin.org/ "Mistcoin") has produced minable SLP tokens.
+- [Mistcoin](https://mistcoin.org/ 'Mistcoin') has produced minable SLP tokens.
 
-- [Flipstarter](https://flipstarter.cash/ "Flipstarter") was researching funding contracts as a way to improve usability, which may be possible with better introspection.
+- [Flipstarter](https://flipstarter.cash/ 'Flipstarter') funding contracts utilizing native introspection might improve usability.
 
-- [SmartBCH](https://smartbch.org/ "SmartBCH") is building an EVM compatible Bitcoin Cash sidechain, and might use introspection as part of a bridge between the main and side chain.
+- [SmartBCH](https://smartbch.org/ 'SmartBCH') is building an EVM compatible Bitcoin Cash sidechain, and might use introspection as part of a bridge between the main and side chain.
 
-### Indepedent Developers
+### Independent Developers
 
-There is a number of independent developers who have an interest in developing tools and services that relies on introspection:
+A number of independent developers are developing tools and services that rely on introspection:
 
-- [bitjson](https://gist.github.com/bitjson "bitjson") created [CashChannels](https://blog.bitjson.com/cashchannels-recurring-payments-for-bitcoin-cash-3b274fbfa6e2 "CashChannels"), reccuring payments for Bitcoin Cash.
+- [bitjson](https://gist.github.com/bitjson 'bitjson') created [CashChannels](https://blog.bitjson.com/cashchannels-recurring-payments-for-bitcoin-cash-3b274fbfa6e2 'CashChannels'), reccuring payments for Bitcoin Cash.
 
-- [haryu703](https://github.com/haryu703 "haryu703") created [Hamingja](https://github.com/SLPVH/hamingja "Hamingja"), a loyalty points system using non-tradable SLP token and is working on an SLP swap/trading contract.
+- [haryu703](https://github.com/haryu703 'haryu703') created [Hamingja](https://github.com/SLPVH/hamingja 'Hamingja'), a loyalty points system using non-tradable SLP token and is working on an SLP swap/trading contract.
 
-- [Licho](https://github.com/KarolTrzeszczkowski "Licho") have created a [Last Will](https://github.com/KarolTrzeszczkowski/Electron-Cash-Last-Will-Plugin "Last Will") contract to manage inheritence, the [Mecenas](https://github.com/KarolTrzeszczkowski/Mecenas-recurring-payment-EC-plugin "Mecenas") contract for recurring payments and also considering to implement traditional games, like [NIM](https://en.m.wikipedia.org/wiki/Nim "NIM").
+- [Licho](https://github.com/KarolTrzeszczkowski 'Licho') created the [Last Will](https://github.com/KarolTrzeszczkowski/Electron-Cash-Last-Will-Plugin 'Last Will') contract to manage inheritance, the [Mecenas](https://github.com/KarolTrzeszczkowski/Mecenas-recurring-payment-EC-plugin 'Mecenas') contract for recurring payments, and is interested in implementing traditional games, like [NIM](https://en.m.wikipedia.org/wiki/Nim 'NIM').
 
-- [p0oker](https://twitter.com/p0oker "p0oker") created an [SLP Vending contract](https://github.com/p0o/yield-farming-bch-smart-contract "SLP Vending contract") that mints tokens on-demand and is building a BCH staking contract that mints tokens over time and an SLP exchange contract to sell NFTs.
+- [p0oker](https://twitter.com/p0oker 'p0oker') created an [SLP Vending contract](https://github.com/p0o/yield-farming-bch-smart-contract 'SLP Vending contract') that mints tokens on-demand and is building 1) a BCH staking contract that mints tokens over time and 2) an SLP exchange contract to sell NFTs.
 
-- [Tobias Ruck](https://twitter.com/TobiasRuck/ "Tobias Ruck") is looking into a non-custodial on-chain gambling product.
+- [Tobias Ruck](https://twitter.com/TobiasRuck/ 'Tobias Ruck') is investigating a non-custodial on-chain gambling product.
 
-- [James Cramer](https://twitter.com/James_Cramer "James Cramer") is experimenting with [SLP Mint Guard](https://github.com/simpleledger/Electron-Cash-SLP/blob/cashscript-dev/lib/cashscript/slp_mint_guard.cash "SLP Mint Guard") to protect minting batons, [SLP Vault](https://github.com/simpleledger/Electron-Cash-SLP/blob/cashscript-dev/lib/cashscript/slp_vault.cash "SLP Vault") to help reclaim unclaimed tokens, making [tokens with minting schedules](https://github.com/simpleledgerinc/slp-mint-contracts "tokens with minting schedules") and [SLP Dollars](https://github.com/simpleledgerinc/cashscript/blob/master/examples/slp_dollar.cash "SLP Dollars") that are tokens freezable by the issuer.
+- [James Cramer](https://twitter.com/James_Cramer 'James Cramer') is experimenting with [SLP Mint Guard](https://github.com/simpleledger/Electron-Cash-SLP/blob/cashscript-dev/lib/cashscript/slp_mint_guard.cash 'SLP Mint Guard') to protect minting batons, [SLP Vault](https://github.com/simpleledger/Electron-Cash-SLP/blob/cashscript-dev/lib/cashscript/slp_vault.cash 'SLP Vault') to help reclaim unclaimed tokens, making [tokens with minting schedules](https://github.com/simpleledgerinc/slp-mint-contracts 'tokens with minting schedules'), and building [SLP Dollars](https://github.com/simpleledgerinc/cashscript/blob/master/examples/slp_dollar.cash 'SLP Dollars') which are freezable by the issuer.
 
 ### Investors
 
-There are people and organizations that have invested into the BCH token and ecosystem on the premise that it is expected to become peer to peer electronic cash for the world. Miners are a clear such group who have invested into the ecosystem. These stakeholders expects the token to get adopted in all the same places where money is traditionally used, which includes in financial services.
+These individuals and organizations have invested in the BCH currency and ecosystem on the premise that it can become peer to peer electronic cash for the world. These stakeholders expect the token to serve effectively as money, including in the innovative financial services which could be enabled by native introspection.
 
 ## Statements
 
 ...
 
-### [General Protocols](https://generalprotocols.com/ "General Protocols")
+### [General Protocols](https://generalprotocols.com/ 'General Protocols')
+
 > The CHIP requires further analysis and specification before it is possible to take a strong position. GP commits to supporting this CHIP with reasonable resources. GP predicts that the benefits to BCH value and network effect will greatly outweigh the costs. Regarding the multiple implementation options available, GP sees multiple good options and encourages the active CHIP participants to choose one with reasonable logic and zero polarization.
 
-### [p0oker](https://twitter.com/p0oker "p0oker")
+### [p0oker](https://twitter.com/p0oker 'p0oker')
+
 > I believe removing the current work arounds with the addition of native introspection OP Codes can improve the reliability of the smart contracts on Bitcoin Cash. Covenants are important and useful in many business use cases and it’s important to make them bulletproof!
 
-### [Licho](https://github.com/KarolTrzeszczkowski "Licho")
+### [Licho](https://github.com/KarolTrzeszczkowski 'Licho')
+
 > The covenant technology have proven to be a vibrant area of BCH development. It allows us to replicate more and more of traditional banking services in a non-custodial way. The native introspection seems to be the key ingredient of the future of permissionless money.
 
-### Tom Zander — founder [Flowee](https://flowee.org/ "Flowee")
+### Tom Zander — founder [Flowee](https://flowee.org/ 'Flowee')
+
 > This CHIP is super valuable and I fully support the direction this is going in and the ideas behind this chip. I will continue to monitor the progress with enthusiasm.
 
 ## Copyright Notice
