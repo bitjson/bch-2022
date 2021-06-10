@@ -1,8 +1,10 @@
 # CHIP-2021-02: Native Introspection Opcodes
 
-> OWNERS: [Jason Dreyzehner](https://gist.github.com/bitjson), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
+> OWNERS: [Jason Dreyzehner](https://bitjson.com/), [Jonathan Silverblood](https://gitlab.com/monsterbitar)
 >
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
+>
+> VERSION: 1.1
 >
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
@@ -14,9 +16,9 @@ This proposal adds a set of new virtual machine (VM) operations which enable BCH
 
 Deployment of this specification is proposed for the May 2022 upgrade.
 
-This proposal does not depend on [`CHIP: Bigger Script Integers`](./CHIP-2021-02-Bigger-Script-Integers.md), but support for larger script numbers is required for all possible results of `OP_UTXOVALUE` to be used in arithmetic operations. It therefore recommended that both CHIPs be deployed together.
+This proposal does not depend on [`CHIP: Bigger Script Integers`](./CHIP-2021-02-Bigger-Script-Integers.md), but support for larger script numbers is required for all possible results of `OP_UTXOVALUE` and `OP_OUTPUTVALUE` to be used in arithmetic operations. It is therefore recommended that both CHIPs be deployed together.
 
-This proposal does not depend on [`CHIP PMv3: Version 3 Transaction Format`](https://github.com/bitjson/pmv3), but it has been updated to include full introspection capabilities for the v3 transaction format. See [Interaction with PMv3](#interaction-with-pmv3) for details.
+This proposal does not depend on [`CHIP: Version 3 Transaction Format (PMv3)`](https://github.com/bitjson/pmv3), but it includes an [integration specification](#chip-integration-version-3-transaction-format-pmv3) to add introspection support for the v3 transaction format. See also: [Interaction with PMv3](#interaction-with-pmv3).
 
 ## Motivation
 
@@ -75,7 +77,7 @@ A range of Bitcoin Cash VM codepoints is reserved for transaction introspection 
 
 ### Nullary Operations
 
-The following 6 operations consume no items and push a single result to the stack.
+The following 6 operations consume no items and push a single result to the stack. If the item to be pushed to the stack is longer than the stack item length limit (A.K.A. `MAX_SCRIPT_ELEMENT_SIZE`), immediately fail evaluation. If the additional stack item would cause the stack to exceed the maximum stack size (A.K.A. `MAX_STACK_SIZE`), immediately fail evaluation.
 
 | Operation         | Codepoint         | Description                                                                                                                                                                                                                                                                                          |
 | ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -91,23 +93,44 @@ The following 6 operations consume no items and push a single result to the stac
 
 ### Unary Operations
 
-The following 9 operations pop the top item from the stack as an index (Script Number) and push a single result to the stack. If the consumed value is not a valid index for the operation, an error is produced.
+The following 9 operations pop the top item from the stack as an index (Script Number) and push a single result to the stack. If the consumed value is not a valid index for the operation, an error is produced. If the item to be pushed to the stack is longer than the stack item length limit (A.K.A. `MAX_SCRIPT_ELEMENT_SIZE`), immediately fail evaluation.
 
-| Operation                    | Codepoint         | Description                                                                                                                                                                                                                                                                        |
-| ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP_UTXOVALUE                 | `0xc6`&nbsp;(198) | Pop the top item from the stack as an input index (Script Number). Push the value (in satoshis) of the Unspent Transaction Output (UTXO) spent by that input to the stack as a Script Number.                                                                                      |
-| OP_UTXOBYTECODE              | `0xc7`&nbsp;(199) | Pop the top item from the stack as an input index (Script Number). Push the full locking bytecode of the Unspent Transaction Output (UTXO) spent by that input to the stack.                                                                                                       |
-| OP_OUTPOINTTXHASH            | `0xc8`&nbsp;(200) | Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint transaction hash – the hash of the transaction which created the Unspent Transaction Output (UTXO) which is being spent – to the stack in big-endian byte order<sup>1</sup>. |
-| OP_OUTPOINTINDEX             | `0xc9`&nbsp;(201) | Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint index – the index of the output in the transaction which created the Unspent Transaction Output (UTXO) which is being spent – to the stack as a Script Number.               |
-| OP_INPUTBYTECODE             | `0xca`&nbsp;(202) | Pop the top item from the stack as an input index (Script Number). Push the unlocking bytecode of the input at that index to the stack. (If the selected input uses a detached proof, the pushed value is the unlocking bytecode content of the detached proof.)<sup>2</sup>       |
-| OP_INPUTSEQUENCENUMBER       | `0xcb`&nbsp;(203) | Pop the top item from the stack as an input index (Script Number). Push the sequence number of the input at that index to the stack as a Script Number.                                                                                                                            |
-| OP_OUTPUTVALUE               | `0xcc`&nbsp;(204) | Pop the top item from the stack as an output index (Script Number). Push the value (in satoshis) of the output at that index to the stack as a Script Number.                                                                                                                      |
-| OP_OUTPUTBYTECODE            | `0xcd`&nbsp;(205) | Pop the top item from the stack as an output index (Script Number). Push the locking bytecode of the output at that index to the stack.                                                                                                                                            |
-| OP_INPUTDETACHED<sup>3</sup> | `0xce`&nbsp;(206) | Pop the top item from the stack as an input index (Script Number). If the input at that index uses a detached proof, push `1` (`0x01`), otherwise push `0` (`0x`, the empty item).                                                                                                 |
+| Operation              | Codepoint         | Description                                                                                                                                                                                                                                                                          |
+| ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OP_UTXOVALUE           | `0xc6`&nbsp;(198) | Pop the top item from the stack as an input index (Script Number). Push the value (in satoshis) of the Unspent Transaction Output (UTXO) spent by that input to the stack as a Script Number.                                                                                        |
+| OP_UTXOBYTECODE        | `0xc7`&nbsp;(199) | Pop the top item from the stack as an input index (Script Number). Push the full locking bytecode of the Unspent Transaction Output (UTXO) spent by that input to the stack.                                                                                                         |
+| OP_OUTPOINTTXHASH      | `0xc8`&nbsp;(200) | Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint transaction hash – the hash of the transaction which created the Unspent Transaction Output (UTXO) which is being spent – to the stack in `OP_HASH256` byte order<sup>1</sup>. |
+| OP_OUTPOINTINDEX       | `0xc9`&nbsp;(201) | Pop the top item from the stack as an input index (Script Number). From that input, push the outpoint index – the index of the output in the transaction which created the Unspent Transaction Output (UTXO) which is being spent – to the stack as a Script Number.                 |
+| OP_INPUTBYTECODE       | `0xca`&nbsp;(202) | Pop the top item from the stack as an input index (Script Number). Push the unlocking bytecode of the input at that index to the stack.                                                                                                                                              |
+| OP_INPUTSEQUENCENUMBER | `0xcb`&nbsp;(203) | Pop the top item from the stack as an input index (Script Number). Push the sequence number of the input at that index to the stack as a Script Number.                                                                                                                              |
+| OP_OUTPUTVALUE         | `0xcc`&nbsp;(204) | Pop the top item from the stack as an output index (Script Number). Push the value (in satoshis) of the output at that index to the stack as a Script Number.                                                                                                                        |
+| OP_OUTPUTBYTECODE      | `0xcd`&nbsp;(205) | Pop the top item from the stack as an output index (Script Number). Push the locking bytecode of the output at that index to the stack.                                                                                                                                              |
 
-1. By specification, the output of the SHA-256 hashing function is [considered to be in big-endian byte order](https://en.wikipedia.org/wiki/Comparison_of_cryptographic_hash_functions#Compression_function). In practice, this is the byte order produced by most libraries, and also the order produced/required by all BCH VM operations which employ SHA-256. For reference, the SHA-256 hash of an empty byte array in big-endian byte order is `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`. (Note, the P2P transaction format encodes this value in the opposite, little-endian order.)
-2. This clarification to `OP_INPUTBYTECODE` is only relevant if this proposal is adopted with or after PMv3.
-3. This operation must only be included if this proposal is adopted with or after PMv3. See [Interaction with PMv3](#interaction-with-pmv3) for details.
+1. This is the byte order produced/required by all BCH VM operations which employ SHA-256 (including `OP_SHA256` and `OP_HASH256`), the byte order used for outpoint transaction hashes in the P2P transaction format, and the byte order produced by most SHA-256 libraries. For reference, the genesis block header in this byte order is little-endian – `6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000` – and can be produced by this script: `<0x0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c> OP_HASH256`. (Note, this is the opposite byte order as is commonly used in user interfaces like block explorers.)
+
+---
+
+### CHIP Integration: Bigger Script Integers
+
+Because VM arithmetic operations currently limit `Script Number` inputs to signed 32-bit integers, the maximum results of `OP_UTXOVALUE` and `OP_OUTPUTVALUE` which can be used in practical contracts is `2147483647` satoshis (`~21.47` BCH). For this reason, **it is recommended that [`CHIP: Bigger Script Integers`](./CHIP-2021-02-Bigger-Script-Integers.md) be deployed before or with this CHIP**.
+
+> This CHIP can be deployed without `CHIP: Bigger Script Integers`, and no direct integration is required between the two CHIPs.
+
+### CHIP Integration: Version 3 Transaction Format (PMv3)
+
+If this proposal is adopted with or after [`CHIP: Version 3 Transaction Format (PMv3)`](https://github.com/bitjson/pmv3), the `OP_INPUTDETACHED` [unary introspection operation](#unary-operations) must also be activated:
+
+| Operation                    | Codepoint         | Description                                                                                                                                                                        |
+| ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP_INPUTDETACHED<sup>3</sup> | `0xce`&nbsp;(206) | Pop the top item from the stack as an input index (Script Number). If the input at that index uses a detached proof, push `1` (`0x01`), otherwise push `0` (`0x`, the empty item). |
+
+> See [Interaction with PMv3](#interaction-with-pmv3) for rationale.
+
+Additionally, the description of `OP_INPUTBYTECODE` can be clarified to confirm that its result is always the input's unlocking bytecode (regardless of whether or not the proof is detached):
+
+| Operation        | Codepoint         | Description                                                                                                                                                                                                                                                      |
+| ---------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP_INPUTBYTECODE | `0xca`&nbsp;(202) | Pop the top item from the stack as an input index (Script Number). Push the unlocking bytecode of the input at that index to the stack. (If the selected input uses a detached proof, the pushed value is the unlocking bytecode content of the detached proof.) |
 
 ## Rationale
 
@@ -169,12 +192,12 @@ For this reason, this proposal does not include any aggregate operations; contra
 >
 > ```
 > <0> <0>
-> OP_BEGIN                                  // loop (re)starts with index, value
->   OP_OVER OP_UTXOVALUE OP_ADD             // Add UTXO value to total
->   OP_SWAP OP_1ADD OP_SWAP                 // increment index
->   OP_OVER OP_TXINPUTCOUNT OP_LESSTHAN     // loop until index >= input count (0, 1, 2, and 3)
-> OP_UNTIL
-> OP_NIP                                    // drop index, leaving sum of UTXO values
+> OP_BEGIN                            // loop (re)starts with index, value
+>   OP_OVER OP_UTXOVALUE OP_ADD       // Add UTXO value to total
+>   OP_SWAP OP_1ADD OP_SWAP           // increment index
+>   OP_OVER OP_TXINPUTCOUNT OP_EQUAL
+> OP_UNTIL                            // loop until next index would exceed final index
+> OP_NIP                              // drop index, leaving sum of UTXO values
 > ```
 
 While not included in this proposal, future proposals may introduce aggregate operations either as a partial alternative to looping operations or as an optimization strategy for common aggregations.
@@ -247,9 +270,9 @@ Delay or rejection of this proposal may incur the following costs:
 - Because the current workaround is difficult to implement securely, implementation problems could result in loss of profits and reputational damage, both for the implementing company and the Bitcoin Cash ecosystem.
 - Some applications and use cases will be impossible without native introspection, and competitors may outcompete for these users.
 
-## List of major stakeholders
+## Primary Stakeholders
 
-At least three major stakeholder groups exist:
+At least three primary stakeholder groups exist:
 
 ### Companies and Organizations
 
@@ -306,6 +329,29 @@ These individuals and organizations have invested in the BCH currency and ecosys
 ### Tom Zander — founder [Flowee](https://flowee.org/ 'Flowee')
 
 > This CHIP is super valuable and I fully support the direction this is going in and the ideas behind this chip. I will continue to monitor the progress with enthusiasm.
+
+## Changelog
+
+This section summarizes the evolution of this document.
+
+- **v1.1 – 2021-6-8** (current)
+  - Added version and `Changelog`
+  - Extracted integration specifications into independent `CHIP Integration` sections
+  - Correct and clarify resulting byte order of `OP_OUTPOINTTXHASH`
+  - Clarify failure of introspection operations which attempt to exceed stack limits
+- **v1.0 – 2021-6-3** ([`163f74be`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/163f74bea8f526d268adf0ab6cb578b9f0bde426/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
+  - Revised technical specification:
+    - Convert `OP_OUTPOINTTXHASH`, `OP_OUTPOINTINDEX`, `OP_UTXOBYTECODE`, and `OP_UTXOVALUE` to unary operations
+    - Group operations by arity (nullary, unary), then by P2P transaction format order
+    - Distinguish `OP_ACTIVEBYTECODE` from unary `OP_UTXOBYTECODE` ([rationale](#differences-between-op_activebytecode-and-op_inputindex-op_utxobytecode))
+    - Removed formatting operations (`OP_NUM2VARINT` and `OP_VARINT2NUM`) and aggregated/hashed/templated operation placeholders
+    - Specified integration strategy for `CHIP: Version 3 Transaction Format (PMv3)` and `CHIP: Bigger Script Integers`
+  - Added `Rationale` section, revised supporting material (`Summary`, `Deployment`, `Motivation`, `Benefits`, etc.)
+- **v0.1 – 2021-3-22** ([`95a99e22`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/95a99e2223671ba6b4801a6a86193b299418a7a3/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
+  - Expanded `Motivation and Benefits`, `Costs and Risks`, and `List of major stakeholders`
+  - Initial technical specification
+- **v0 – 2021-2-21** ([`53989f7d`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/53989f7d67a3afbc97ff87d6e94ef8e5c98fddf8/May%202022,%20Native%20Introspection.md))
+  - Initial draft
 
 ## Copyright Notice
 
