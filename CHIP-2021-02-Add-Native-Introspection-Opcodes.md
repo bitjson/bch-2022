@@ -4,7 +4,7 @@
 >
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
 >
-> VERSION: 1.1
+> VERSION: 1.1.1
 >
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
@@ -330,11 +330,17 @@ These individuals and organizations have invested in the BCH currency and ecosys
 
 > This CHIP is super valuable and I fully support the direction this is going in and the ideas behind this chip. I will continue to monitor the progress with enthusiasm.
 
+### Jimtendo - [recurr.app](https://recurr.app/ 'Recurr')
+
+> Introspection is a useful and welcome addition to Bitcoin Cash's Smart Contract capabilities. This CHIP describes a well thought-out and efficient way of achieving it and therefore has my full support and endorsement.
+
 ## Changelog
 
 This section summarizes the evolution of this document.
 
-- **v1.1 – 2021-6-8** (current)
+- **v1.1.1 - 2021-6-10** (current)
+  - Added statement from stakeholder
+- **v1.1 – 2021-6-8**
   - Added version and `Changelog`
   - Extracted integration specifications into independent `CHIP Integration` sections
   - Correct and clarify resulting byte order of `OP_OUTPOINTTXHASH`
