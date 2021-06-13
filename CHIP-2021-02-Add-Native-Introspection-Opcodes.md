@@ -334,6 +334,11 @@ These individuals and organizations have invested in the BCH currency and ecosys
 
 > Introspection is a useful and welcome addition to Bitcoin Cash's Smart Contract capabilities. This CHIP describes a well thought-out and efficient way of achieving it and therefore has my full support and endorsement.
 
+### [Rosco Kalis](https://kalis.me/) - [cashscript](https://cashscript.org/)
+
+> If this CHIP is implemented, I will commit to supporting the entire range of implemented introspection opcodes in CashScript. This greatly simplifies the compiler code that deals with introspection and will result in smaller and more efficient covenant contracts.
+
+
 ## Changelog
 
 This section summarizes the evolution of this document.
