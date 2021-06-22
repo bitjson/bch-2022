@@ -4,13 +4,13 @@
 >
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
 >
-> VERSION: 1.1.1
+> VERSION: 1.1.2
 >
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
 ## Summary
 
-This proposal adds a set of new virtual machine (VM) operations which enable BCH contracts to efficiently access details about the current transaction like output values, recipients, and more.
+This proposal adds a set of new virtual machine (VM) operations which enable BCH contracts to efficiently access details about the current transaction like output values, recipients, and more – without increasing transaction validation costs.
 
 ## Deployment
 
@@ -27,6 +27,8 @@ Since the introduction of OP_CHECKDATASIG (2018-11-15), it has been possible to 
 Covenants enable a wide range of new innovation, but the strategy by which they are currently implemented is extremely inefficient: most of a transactions contents must be duplicated for each input which utilizes a covenant. In practice, this doubles or triples the size of even the simplest covenant transactions<sup>1</sup>, and advanced covenant applications quickly exceed VM limits such as the maximum standard unlocking bytecode length (A.K.A. `MAX_TX_IN_SCRIPT_SIG_SIZE`) of 1,650 bytes. This severely limits the extent of current BCH covenant development and usage.
 
 > Covenants are currently implemented using a workaround in which the same signature is checked by both `OP_CHECKSIG` and `OP_CHECKDATASIG`. The `OP_CHECKSIG` confirms the signature is valid for the current transaction, and the `OP_CHECKDATASIG` allows the contract to validate that the signature covers a particular preimage provided in the unlocking bytecode. If both checks are successful, the contract can trust that the preimage provided to `OP_CHECKDATASIG` is the genuine signing serialization of the current transaction. By further inspecting this preimage, the contract can validate other properties of the transaction.
+
+Because nodes are already required to have full access to a transaction's contents and UTXO information during transaction validation, native introspection opcodes can be introduced without impacting existing transaction validation costs.
 
 <details>
 <summary><b>Calculations</b></summary>
@@ -93,7 +95,7 @@ The following 6 operations consume no items and push a single result to the stac
 
 ### Unary Operations
 
-The following 9 operations pop the top item from the stack as an index (Script Number) and push a single result to the stack. If the consumed value is not a valid index for the operation, an error is produced. If the item to be pushed to the stack is longer than the stack item length limit (A.K.A. `MAX_SCRIPT_ELEMENT_SIZE`), immediately fail evaluation.
+The following 9 operations pop the top item from the stack as an index (Script Number) and push a single result to the stack. If the consumed value is not a valid, minimally-encoded index for the operation, an error is produced. If the item to be pushed to the stack is longer than the stack item length limit (A.K.A. `MAX_SCRIPT_ELEMENT_SIZE`), immediately fail evaluation.
 
 | Operation              | Codepoint         | Description                                                                                                                                                                                                                                                                          |
 | ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -114,7 +116,7 @@ The following 9 operations pop the top item from the stack as an index (Script N
 
 Because VM arithmetic operations currently limit `Script Number` inputs to signed 32-bit integers, the maximum results of `OP_UTXOVALUE` and `OP_OUTPUTVALUE` which can be used in practical contracts is `2147483647` satoshis (`~21.47` BCH). For this reason, **it is recommended that [`CHIP: Bigger Script Integers`](./CHIP-2021-02-Bigger-Script-Integers.md) be deployed before or with this CHIP**.
 
-> This CHIP can be deployed without `CHIP: Bigger Script Integers`, and no direct integration is required between the two CHIPs.
+This CHIP can be deployed without `CHIP: Bigger Script Integers`, and no direct integration is required between the two CHIPs. If `CHIP: Bigger Script Integers` is not deployed with or before this proposal, the above specified operations must still behave as specified. (`OP_UTXOVALUE` and `OP_OUTPUTVALUE` may push Script Numbers to the stack which are up to 8 bytes in length and therefore could not be used as inputs to arithmetic operations. Until some arithmetic range upgrade, these operations would likely only be used in practice for values which can be encoded in 4 bytes or less.)
 
 ### CHIP Integration: Version 3 Transaction Format (PMv3)
 
@@ -268,7 +270,7 @@ Delay or rejection of this proposal may incur the following costs:
 - Continued use of the inefficient workaround increases the size of the blockchain could negatively impact initial block download times and storage requirements.
 - The complexity of the current workaround increases development costs and raises the barrier to entry for new developers.
 - Because the current workaround is difficult to implement securely, implementation problems could result in loss of profits and reputational damage, both for the implementing company and the Bitcoin Cash ecosystem.
-- Some applications and use cases will be impossible without native introspection, and competitors may outcompete for these users.
+- Some applications and use cases will be impossible without native introspection, and competitors may outcompete BCH for these users.
 
 ## Primary Stakeholders
 
@@ -338,14 +340,17 @@ These individuals and organizations have invested in the BCH currency and ecosys
 
 > If this CHIP is implemented, I will commit to supporting the entire range of implemented introspection opcodes in CashScript. This greatly simplifies the compiler code that deals with introspection and will result in smaller and more efficient covenant contracts.
 
-
 ## Changelog
 
 This section summarizes the evolution of this document.
 
-- **v1.1.1 - 2021-6-10** (current)
+- **v1.1.2 - 2021-6-22** (current)
+  - Clarify minimal-encoding requirement for unary operation indexes
+  - Clarify interaction with `CHIP: Bigger Script Integers`
+  - Clarify (lack of) effect on transaction validation costs
+- **v1.1.1 - 2021-6-10** ([`f501154f`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/f501154fce8bec0f8572ddfef0a689f72384a35d/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
   - Added statement from stakeholder
-- **v1.1 – 2021-6-8**
+- **v1.1 – 2021-6-8** ([`d67eb98b`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/d67eb98be9db0f009859b7b945f1ac7fa4a24be9/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
   - Added version and `Changelog`
   - Extracted integration specifications into independent `CHIP Integration` sections
   - Correct and clarify resulting byte order of `OP_OUTPOINTTXHASH`
