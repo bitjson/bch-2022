@@ -4,7 +4,7 @@
 >
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
 >
-> VERSION: 1.1.2
+> VERSION: 1.1.3
 >
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
@@ -81,16 +81,16 @@ A range of Bitcoin Cash VM codepoints is reserved for transaction introspection 
 
 The following 6 operations consume no items and push a single result to the stack. If the item to be pushed to the stack is longer than the stack item length limit (A.K.A. `MAX_SCRIPT_ELEMENT_SIZE`), immediately fail evaluation. If the additional stack item would cause the stack to exceed the maximum stack size (A.K.A. `MAX_STACK_SIZE`), immediately fail evaluation.
 
-| Operation         | Codepoint         | Description                                                                                                                                                                                                                                                                                          |
-| ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP_INPUTINDEX     | `0xc0`&nbsp;(192) | Push the index of the input being evaluated to the stack as a Script Number.                                                                                                                                                                                                                         |
-| OP_ACTIVEBYTECODE | `0xc1`&nbsp;(193) | Push the full bytecode currently being evaluated to the stack<sup>1</sup>. For Pay-to-Script-Hash (P2SH) evaluations, this is the redeem bytecode of the Unspent Transaction Output (UTXO) being spent; for all other evaluations, this is the locking bytecode of the UTXO being spent.<sup>2</sup> |
-| OP_TXVERSION      | `0xc2`&nbsp;(194) | Push the version of the current transaction to the stack as a Script Number.                                                                                                                                                                                                                         |
-| OP_TXINPUTCOUNT   | `0xc3`&nbsp;(195) | Push the count of inputs in the current transaction to the stack as a Script Number.                                                                                                                                                                                                                 |
-| OP_TXOUTPUTCOUNT  | `0xc4`&nbsp;(196) | Push the count of outputs in the current transaction to the stack as a Script Number.                                                                                                                                                                                                                |
-| OP_TXLOCKTIME     | `0xc5`&nbsp;(197) | Push the locktime of the current transaction to the stack as a Script Number.                                                                                                                                                                                                                        |
+| Operation         | Codepoint         | Description                                                                                                                                                                                                                                                                                                                                            |
+| ----------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OP_INPUTINDEX     | `0xc0`&nbsp;(192) | Push the index of the input being evaluated to the stack as a Script Number.                                                                                                                                                                                                                                                                           |
+| OP_ACTIVEBYTECODE | `0xc1`&nbsp;(193) | Push the bytecode currently being evaluated, beginning after the last executed `OP_CODESEPARATOR`, to the stack<sup>1</sup>. For Pay-to-Script-Hash (P2SH) evaluations, this is the redeem bytecode of the Unspent Transaction Output (UTXO) being spent; for all other evaluations, this is the locking bytecode of the UTXO being spent.<sup>2</sup> |
+| OP_TXVERSION      | `0xc2`&nbsp;(194) | Push the version of the current transaction to the stack as a Script Number.                                                                                                                                                                                                                                                                           |
+| OP_TXINPUTCOUNT   | `0xc3`&nbsp;(195) | Push the count of inputs in the current transaction to the stack as a Script Number.                                                                                                                                                                                                                                                                   |
+| OP_TXOUTPUTCOUNT  | `0xc4`&nbsp;(196) | Push the count of outputs in the current transaction to the stack as a Script Number.                                                                                                                                                                                                                                                                  |
+| OP_TXLOCKTIME     | `0xc5`&nbsp;(197) | Push the locktime of the current transaction to the stack as a Script Number.                                                                                                                                                                                                                                                                          |
 
-1. `OP_CODESEPARATOR` has no effect on the result of `OP_ACTIVEBYTECODE`; `OP_ACTIVEBYTECODE` always pushes the full, serialized bytecode for the instructions currently under evaluation. (In the Satoshi implementation, this is simply the `CScript` contents passed to the current `EvalScript`.)
+1. `OP_ACTIVEBYTECODE` pushes the serialized bytecode for the instructions currently under evaluation beginning after the most recently executed `OP_CODESEPARATOR` and continuing through the final instruction. If no `OP_CODESEPARATOR` has been executed, `OP_ACTIVEBYTECODE` pushes the full, serialized bytecode for the instructions currently under evaluation. (In the Satoshi implementation, this is simply the `CScript` contents passed to the current `EvalScript`.)
 2. This behavior matches the existing behavior of the BCH VM during P2SH evaluation – once the P2SH pattern is matched, the remaining stack is copied, and the VM begins evaluation again with the P2SH redeem bytecode set as the new `active bytecode`. (In the Satoshi implementation, this P2SH redeem bytecode is passed as a `CScript` to a new execution of `EvalScript`.)
 
 ### Unary Operations
@@ -156,7 +156,7 @@ This strategy necessarily incorporates operations which may initially seem to du
 
 By implementing introspection in a single deployment as a complete, logical set of operations – rather than by piecemeal activation as contract authors lobby for operations which are important for their use cases – we allow new innovation to take place primarily in "userspace" and limit future technical debt.
 
-> Note: introspection of dynamic VM state – like current instruction pointer index, last `OP_CODESEPARATOR` index, the current state of various cumulative limits, etc. – is intentionally excluded from this specification.
+> Note: introspection of dynamic VM state – e.g. current instruction pointer index, the current state of various cumulative limits, etc. – is intentionally excluded from this specification.
 >
 > This approach avoids consensus standardization of various implementation details which could complicate some implementations and requires further research and justification. Instead, this proposal incorporates only introspection operations for previously consensus-standardized, static properties of transaction and evaluation state which are already available to contracts via the `OP_CHECKSIG` + `OP_CHECKDATASIG` hack.
 
@@ -246,6 +246,12 @@ As such – and because introspection operations are critical to all covenant us
 For clarity, this proposal does not modify the existing limitation (present since [BCH_2018-11-15](https://documentation.cash/protocol/forks/hf-20181115#push-only)) preventing transactions from including "non-push" operations – all operations at codepoints greater than 96 (`0x60`) – in unlocking bytecode. This limitation also prevents all operations specified in this proposal from appearing in unlocking bytecode.
 
 This limitation is maintained to prevent a third-party malleability vector: any non-push operation can be replaced in a malleated transaction with an equivalent push operation pushing the computed result of the non-push operation. While all third-party malleability vectors would be eliminated by [PMv3's detached signatures](hhttps://github.com/bitjson/pmv3#comprehensive-malleability-protection), this CHIP leaves any loosening of the non-push limitation to future proposals.
+
+### `OP_ACTIVEBYTECODE` Support for `OP_CODESEPARATOR`
+
+In earlier versions of this proposal, the result of `OP_ACTIVEBYTECODE` did not account for the last executed `OP_CODESEPARATOR`. However, the current behavior is considered more conservative (`OP_ACTIVEBYTECODE` returns the active bytecode beginning after the last evaluated `OP_CODESEPARATOR`). Contracts which don't utilize `OP_CODESEPARATOR` are unaffected by this change, contracts which utilize `OP_CODESEPARATOR` can access either behavior (an earlier result of `OP_ACTIVEBYTECODE` can always be saved for use after `OP_CODESEPARATOR` is called), and some unusual contracts may be able to utilize the new behavior to optimize their bytecode size or runtime requirements.
+
+Notably, the index of the last executed `OP_CODESEPARATOR` is available using the [`OP_CHECKSIG` + `OP_CHECKDATASIG` workaround](#motivation), so providing access to this state via `OP_ACTIVEBYTECODE` is also valuable for [operation set completeness](#operation-set-completeness).
 
 ## Implementations
 
@@ -344,7 +350,9 @@ These individuals and organizations have invested in the BCH currency and ecosys
 
 This section summarizes the evolution of this document.
 
-- **v1.1.2 - 2021-6-22** (current)
+- **v1.1.3 - 2021-8-25** (current)
+  - Add support for `OP_CODESEPARATOR` in `OP_ACTIVEBYTECODE` ([#27](https://gitlab.com/GeneralProtocols/research/chips/-/issues/27))
+- **v1.1.2 - 2021-6-22** ([`e9e8a67d`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/e9e8a67debc9c24aad1129b2df1bb0fc23cd6edc/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
   - Clarify minimal-encoding requirement for unary operation indexes
   - Clarify interaction with `CHIP: Bigger Script Integers`
   - Clarify (lack of) effect on transaction validation costs
