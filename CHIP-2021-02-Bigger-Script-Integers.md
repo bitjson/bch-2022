@@ -138,7 +138,7 @@ While unusual, it is possible to design contracts which rely on the rejection of
 | `0xfeffffffffffffff` | -9223372036854775806           |
 | `0xffffffffffffff`   | -36028797018963967             |
 | `0xffffffffffff`     | -140737488355327               |
-| `0xffffffffff`       | -549755813887n                 |
+| `0xffffffffff`       | -549755813887                  |
 | `0xffffffff`         | -2147483647                    |
 | `0xfeffffff`         | -2147483646                    |
 | `0xfdffffff`         | -2147483645                    |
