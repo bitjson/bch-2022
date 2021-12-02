@@ -4,7 +4,7 @@
 >
 > DISCUSSION: [Bitcoin Cash Research](https://bitcoincashresearch.org/t/native-introspection-chip-discussion/307), [Telegram](https://t.me/transactionintrospection)
 >
-> VERSION: 1.1.3
+> VERSION: 1.1.4
 >
 > MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
 
@@ -259,7 +259,7 @@ Notably, the index of the last executed `OP_CODESEPARATOR` is available using th
 
 ### Test Cases
 
-_(in progress)_
+- [Bitcoin Cash Node (BCHN) Native Introspection Tests](https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node/-/blob/6fff8c761fda0ad15c9752d02db31aa65d58170f/src/test/native_introspection_tests.cpp)
 
 ## Evaluation of Alternatives
 
@@ -350,7 +350,9 @@ These individuals and organizations have invested in the BCH currency and ecosys
 
 This section summarizes the evolution of this document.
 
-- **v1.1.3 - 2021-8-25** (current)
+- **v1.1.4 - 2021-12-1** (current)
+  - Link to BCHN test cases
+- **v1.1.3 - 2021-8-25** ([`29054bb8`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/29054bb8215d059790edd03130b973f7626159c6/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
   - Add support for `OP_CODESEPARATOR` in `OP_ACTIVEBYTECODE` ([#27](https://gitlab.com/GeneralProtocols/research/chips/-/issues/27))
 - **v1.1.2 - 2021-6-22** ([`e9e8a67d`](https://gitlab.com/GeneralProtocols/research/chips/-/blob/e9e8a67debc9c24aad1129b2df1bb0fc23cd6edc/CHIP-2021-02-Add-Native-Introspection-Opcodes.md))
   - Clarify minimal-encoding requirement for unary operation indexes
