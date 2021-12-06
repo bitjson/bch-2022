@@ -6,7 +6,7 @@
 >
 > VERSION: 1.1.4
 >
-> MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, Testnet (August), Specification (October), Accepted (November), Deployed (May 15th, 2022).
+> MILESTONES: **[Published](https://gitlab.com/GeneralProtocols/research/-/blob/master/CHIPs/May%202022,%20Native%20Introspection.md)**, **[Specification](#technical-specification)**, **[Testnet](https://read.cash/@bitcoincashnode/bch-testnet4-for-may-2022-network-upgrade-updated-2021-11-23-95a21d51)**, **Accepted ([BU](https://twitter.com/BitcoinUnlimit/status/1460394221240786956) - [BCHN](https://twitter.com/bitcoincashnode/status/1460424339816284161) - [Knuth](https://twitter.com/KnuthNode/status/1460622308607938579) - [Verde](https://twitter.com/joshmgreen/status/1460592944516317185) - [Bitauth](https://twitter.com/Bitauth/status/1460371045207232512))**, Deployed (May 15th, 2022).
 
 ## Summary
 
